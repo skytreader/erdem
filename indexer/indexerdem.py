@@ -1,22 +1,26 @@
 from argparse import ArgumentParser
+from importlib import import_module
+from typing import List, Set, Tuple
 
 import sqlite3
 
 class Indexerdem(object):
 
-    def __init__(self, index_filename: str):
+    def __init__(self, index_filename: str, locale: str="en"):
         self.conn = sqlite3.connect(index_filename)
+        person_providers_module = import_module("faker.providers.person.%s" % locale)
+        self.first_names_female: Set[str] = set(person_providers_module.Provider.first_names_female)
+        self.last_names: Set[str] = set(person_providers_module.Provider.last_names)
 
     def init(self):
         cursor = self.conn.cursor()
 
         cursor.execute("PRAGMA foreign_keys=ON")
-        # FIXME what if tables already exist?
-        cursor.execute("""CREATE TABLE files
+        cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC, filename TEXT UNIQUE NOT NULL);""")
-        cursor.execute("""CREATE TABLE persons
+        cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC, firstname TEXT NOT NULL, lastname TEXT);""")
-        cursor.execute("""CREATE TABLE participation
+        cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER,
                            FOREIGN KEY(person_id) REFERENCES persons(id),
                            FOREIGN KEY(file_id) REFERENCES file(id))""")
@@ -26,6 +30,21 @@ class Indexerdem(object):
         spam = filename.split(".")
         # TODO Check, there might be dots before the extension too!
         return spam[0]
+
+    def __find_names(self, haystack: str) -> Tuple[str]:
+        def sanitize(s: str) -> str:
+            return "".join([c for c in s if str.isalpha(c)])
+
+        hayparse: List[str] = haystack.split()
+        names: List[str] = []
+        i = 0
+        limit = len(hayparse)
+
+        while i < limit:
+            word = hayparse[i]
+            sanitized = sanitize(word)
+
+            i += 1
 
     def index(self, filename: str) -> None:
         cleaned = self.__normalize_filename(filename)
