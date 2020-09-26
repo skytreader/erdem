@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from importlib import import_module
-from typing import List, Set, Tuple
+from typing import Iterable, List, Set, Tuple
 
 import re
 import sqlite3
@@ -33,12 +33,12 @@ class Indexerdem(object):
         spam = filename.rsplit(".", 1)
         return spam[0]
 
-    def __find_names(self, haystack: str) -> Tuple[str]:
+    def __find_names(self, haystack: str) -> Iterable[Tuple[str]]:
         def sanitize(s: str) -> str:
             return "".join([c for c in s if str.isalpha(c)])
 
         hayparse: List[str] = NONWORD.split(haystack)
-        names: List[str] = []
+        names: List[Tuple[str]] = []
         i = 0
         limit = len(hayparse)
 
@@ -50,23 +50,38 @@ class Indexerdem(object):
                 forward = i + 1
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
-                        person = (sanitized, hayparse[forward])
-                        cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", person)
+                        names.append((sanitized, hayparse[forward]))
                         i = forward
                         continue
                     else:
-                        person = (sanitized,)
-                        cursor.execute("INSERT INTO persons (firstname) VALUES (?)", person)
+                        names.append((sanitized,))
                 else:
-                    person = (sanitized,)
-                    cursor.execute("INSERT INTO persons (firstname) VALUES (?)", person)
+                    names.append((sanitized,))
 
             i += 1
+        
+        return names
 
     def index(self, filename: str) -> None:
-        cleaned = self.__normalize_filename(filename)
-        cursor = self.conn.cursor()
-        cursor.execute("INSERT INTO files (filename) VALUES (?)", (filename,))
+        try:
+            cleaned = self.__normalize_filename(filename)
+            cursor = self.conn.cursor()
+            cursor.execute("INSERT INTO files (filename) VALUES (?)", (filename,))
+            names = self.__find_names(cleaned)
+
+            for name in names:
+                if len(name) == 2:
+                    cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
+                elif len(name) == 1:
+                    cursor.execute("INSERT INTO persons (firstname) VALUES (?)", name)
+                else:
+                    print("Found an odd name: %s" % name)
+
+        except:
+            print("Ran into some problems...")
+        finally:
+            self.conn.commit()
+            self.conn.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
