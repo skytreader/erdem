@@ -2,7 +2,10 @@ from argparse import ArgumentParser
 from importlib import import_module
 from typing import List, Set, Tuple
 
+import re
 import sqlite3
+
+NONWORD: re.Pattern = re.compile("\W+")
 
 class Indexerdem(object):
 
@@ -27,15 +30,14 @@ class Indexerdem(object):
         self.conn.commit()
 
     def __normalize_filename(self, filename: str) -> str:
-        spam = filename.split(".")
-        # TODO Check, there might be dots before the extension too!
+        spam = filename.rsplit(".", 1)
         return spam[0]
 
     def __find_names(self, haystack: str) -> Tuple[str]:
         def sanitize(s: str) -> str:
             return "".join([c for c in s if str.isalpha(c)])
 
-        hayparse: List[str] = haystack.split()
+        hayparse: List[str] = NONWORD.split(haystack)
         names: List[str] = []
         i = 0
         limit = len(hayparse)
@@ -43,6 +45,21 @@ class Indexerdem(object):
         while i < limit:
             word = hayparse[i]
             sanitized = sanitize(word)
+
+            if sanitized in self.first_names_female:
+                forward = i + 1
+                if forward < limit:
+                    if hayparse[forward] in self.last_names:
+                        person = (sanitized, hayparse[forward])
+                        cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", person)
+                        i = forward
+                        continue
+                    else:
+                        person = (sanitized,)
+                        cursor.execute("INSERT INTO persons (firstname) VALUES (?)", person)
+                else:
+                    person = (sanitized,)
+                    cursor.execute("INSERT INTO persons (firstname) VALUES (?)", person)
 
             i += 1
 
