@@ -2,10 +2,15 @@ from argparse import ArgumentParser
 from importlib import import_module
 from typing import Iterable, List, Set, Tuple
 
+import logging
+import os
 import re
 import sqlite3
 
 NONWORD: re.Pattern = re.compile("\W+")
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.INFO)
+logger.addHandler(logging.StreamHandler())
 
 class Indexerdem(object):
 
@@ -78,13 +83,22 @@ class Indexerdem(object):
                     print("Found an odd name: %s" % name)
 
         except:
-            print("Ran into some problems...")
+            logger.error("Ran into some problems...")
         finally:
             self.conn.commit()
+
+    def readdir(self, dirpath: str) -> None:
+        try:
+            for root, dirs, files in os.walk(dirpath):
+                for _file in files:
+                    logger.info("processing %s" % _file)
+                    self.index(_file)
+        except:
+            logger.error("Ran into some problems...")
             self.conn.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
     indexer: Indexerdem = Indexerdem("cache.db")
     indexer.init()
-    indexer.index("lin.mp4")
+    indexer.readdir("/home/chad/Videos/ytdlpl")
