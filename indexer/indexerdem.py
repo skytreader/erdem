@@ -83,7 +83,7 @@ class Indexerdem(object):
                     print("Found an odd name: %s" % name)
 
         except:
-            logger.error("Ran into some problems...")
+            logger.exception("Ran into some problems...")
         finally:
             self.conn.commit()
 
@@ -94,11 +94,17 @@ class Indexerdem(object):
                     logger.info("processing %s" % _file)
                     self.index(_file)
         except:
-            logger.error("Ran into some problems...")
+            logger.exception("Ran into some problems...")
+        finally:
             self.conn.close()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
+    parser.add_argument(
+        "--filepath", "-f", required=True, type=str,
+        help="The full filepath of the directory to index."
+    )
+    args = vars(parser.parse_args())
     indexer: Indexerdem = Indexerdem("cache.db")
     indexer.init()
-    indexer.readdir("/home/chad/Videos/ytdlpl")
+    indexer.readdir(args["filepath"])
