@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
 from importlib import import_module
-from typing import Iterable, List, Set, Tuple
+from typing import Iterable, Optional, List, Set, Tuple
 
 import logging
 import os
@@ -13,6 +13,9 @@ logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 class Indexerdem(object):
+
+    SQLITE_TRUE = 1
+    SQLITE_FALSE = 0
 
     def __init__(self, index_filename: str, locale: str="en"):
         self.conn = sqlite3.connect(index_filename)
@@ -27,11 +30,11 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC, filename TEXT UNIQUE NOT NULL);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
-                          (id INTEGER PRIMARY KEY ASC, firstname TEXT NOT NULL, lastname TEXT);""")
+                          (id INTEGER PRIMARY KEY ASC, firstname TEXT UNIQUE NOT NULL, lastname TEXT UNIQUE);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
-                          (person_id INTEGER, file_id INTEGER,
+                          (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
                            FOREIGN KEY(person_id) REFERENCES persons(id),
-                           FOREIGN KEY(file_id) REFERENCES file(id))""")
+                           FOREIGN KEY(file_id) REFERENCES files(id))""".format(is_certain_default=Indexerdem.SQLITE_TRUE))
         self.conn.commit()
 
     def __normalize_filename(self, filename: str) -> str:
@@ -59,28 +62,44 @@ class Indexerdem(object):
                         i = forward
                         continue
                     else:
-                        names.append((sanitized,))
+                        names.append((sanitized, None))
                 else:
-                    names.append((sanitized,))
+                    names.append((sanitized, None))
 
             i += 1
         
         return names
+
+    def __get_person_id(self, cursor, firstname: str, lastname: str) -> Optional[int]:
+        test = cursor.execute("SELECT id FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
+        if test:
+            return test[0]
+        else:
+            return None
 
     def index(self, filename: str) -> None:
         try:
             cleaned = self.__normalize_filename(filename)
             cursor = self.conn.cursor()
             cursor.execute("INSERT INTO files (filename) VALUES (?)", (filename,))
+            file_id = cursor.lastrowid
             names = self.__find_names(cleaned)
 
             for name in names:
                 if len(name) == 2:
-                    cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
-                elif len(name) == 1:
-                    cursor.execute("INSERT INTO persons (firstname) VALUES (?)", name)
+                    person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
+                    if person_id is None:
+                        logger.info("Inserting %s" % str(name))
+                        cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
+                        person_id = cursor.lastrowid
+
+                    certainty = Indexerdem.SQLITE_TRUE if name[1] is not None else Indexerdem.SQLITE_FALSE
+                    cursor.execute(
+                        "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
+                        (person_id, file_id, certainty)
+                    )
                 else:
-                    print("Found an odd name: %s" % name)
+                    logger.error("Found an odd name: %s" % name)
 
         except:
             logger.exception("Ran into some problems...")
