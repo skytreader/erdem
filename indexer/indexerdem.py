@@ -70,8 +70,12 @@ class Indexerdem(object):
         
         return names
 
-    def __get_person_id(self, cursor, firstname: str, lastname: str) -> Optional[int]:
-        test = cursor.execute("SELECT id FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
+    def __get_person_id(self, cursor, firstname: str, lastname: Optional[str]) -> Optional[int]:
+        if lastname is not None:
+            test = cursor.execute("SELECT id FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
+        else:
+            test = cursor.execute("SELECT id FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
+
         if test:
             return test[0]
         else:
@@ -89,7 +93,7 @@ class Indexerdem(object):
                 if len(name) == 2:
                     person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
                     if person_id is None:
-                        logger.info("Inserting %s" % str(name))
+                        logger.info("Inserting %s because person_id is %s" % (str(name), person_id))
                         cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
                         person_id = cursor.lastrowid
 
@@ -104,6 +108,7 @@ class Indexerdem(object):
         except:
             logger.exception("Ran into some problems...")
         finally:
+            logger.info("committing...")
             self.conn.commit()
 
     def readdir(self, dirpath: str) -> None:
