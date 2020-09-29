@@ -9,8 +9,9 @@ Assumptions:
 - Names are weird, the filenames even weirder/less standard.
 """
 from argparse import ArgumentParser
+from collections import OrderedDict
 from importlib import import_module
-from typing import Iterable, Optional, List, Set, Tuple
+from typing import Iterable, Optional, List, Set, Tuple, Union
 
 import logging
 import os
@@ -27,14 +28,23 @@ class Indexerdem(object):
     SQLITE_TRUE = 1
     SQLITE_FALSE = 0
 
-    def __init__(self, index_filename: str, locale: str="en"):
+    def __init__(self, index_filename: str, locales: Iterable[str]):
         self.conn = sqlite3.connect(index_filename)
-        person_providers_module = import_module("faker.providers.person.%s" % locale)
-        self.first_names_female: Set[str] = set(person_providers_module.Provider.first_names_female)
-        self.last_names: Set[str] = (
-            set(person_providers_module.Provider.last_names) |
-            set(person_providers_module.Provider.first_names_male)
-        )
+        self.first_names_female: Set[str] = set()
+        self.last_names: Set[str] = set()
+        for loc in locales:
+            person_providers_module = import_module("faker.providers.person.%s" % loc)
+            self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female)
+            self.last_names |= self.__extract_names(person_providers_module.Provider.last_names)
+            self.last_names |= self.__extract_names(person_providers_module.Provider.first_names_male)
+
+    def __extract_names(self, faker_listings: Union[OrderedDict, Tuple]) -> Set[str]:
+        if isinstance(faker_listings, tuple):
+            return set(faker_listings)
+        elif isinstance(faker_listings, OrderedDict):
+            return set(faker_listings.keys())
+        else:
+            raise TypeError("We only know how to operate with OrderedDicts or tuples. Given: %s" % type(faker_listings))
 
     def init(self):
         cursor = self.conn.cursor()
@@ -70,6 +80,10 @@ class Indexerdem(object):
             word = hayparse[i]
             sanitized = sanitize(word)
 
+            # FIXME This assumes names are only two-part. The "reasonable" thing
+            # to do would be to consume until we encounter something that isn't
+            # a name. However, watch out that sanitation means we lose boundary
+            # cues in comma-listed names.
             if sanitized in self.first_names_female:
                 forward = i + 1
                 if forward < limit:
@@ -144,7 +158,11 @@ if __name__ == "__main__":
         "--filepath", "-f", required=True, type=str,
         help="The full filepath of the directory to index."
     )
+    parser.add_argument(
+        "--locales", "-l", type=str, default="en,en_GB,en_US,en_NZ",
+        help="Comma-separated list of locales that we will use to detect names."
+    )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem("cache.db")
+    indexer: Indexerdem = Indexerdem("cache.db", args["locales"].split(","))
     indexer.init()
     indexer.readdir(args["filepath"])
