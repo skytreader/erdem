@@ -1,3 +1,13 @@
+"""
+Assumptions:
+
+- The filenames contain names but the library, as a whole cluster around 
+  specific individuals, with very little overlap (though they certainly exist).
+  So, for example, if we encounter "Emily Browning" subsequent references to
+  "Emily" is probably also "Emily Browning" but "Emily Blunt" is probably also
+  in there.
+- Names are weird, the filenames even weirder/less standard.
+"""
 from argparse import ArgumentParser
 from importlib import import_module
 from typing import Iterable, Optional, List, Set, Tuple
@@ -21,7 +31,10 @@ class Indexerdem(object):
         self.conn = sqlite3.connect(index_filename)
         person_providers_module = import_module("faker.providers.person.%s" % locale)
         self.first_names_female: Set[str] = set(person_providers_module.Provider.first_names_female)
-        self.last_names: Set[str] = set(person_providers_module.Provider.last_names)
+        self.last_names: Set[str] = (
+            set(person_providers_module.Provider.last_names) |
+            set(person_providers_module.Provider.first_names_male)
+        )
 
     def init(self):
         cursor = self.conn.cursor()
@@ -39,11 +52,11 @@ class Indexerdem(object):
 
     def __normalize_filename(self, filename: str) -> str:
         spam = filename.rsplit(".", 1)
-        return spam[0]
+        return spam[0].replace("&", "and")
 
     def __find_names(self, haystack: str) -> Iterable[Tuple[str]]:
         def sanitize(s: str) -> str:
-            return "".join([c for c in s if str.isalpha(c)])
+            return "".join([c for c in s if str.isalpha(c)]).title()
 
         hayparse: List[str] = NONWORD.split(haystack)
         names: List[Tuple[str]] = []
