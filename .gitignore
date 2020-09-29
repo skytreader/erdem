@@ -23,3 +23,5 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 
 *.db
+*.swp
+__pycache__
