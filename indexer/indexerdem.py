@@ -43,7 +43,10 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC, filename TEXT UNIQUE NOT NULL);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
-                          (id INTEGER PRIMARY KEY ASC, firstname TEXT UNIQUE NOT NULL, lastname TEXT UNIQUE);""")
+                          (id INTEGER PRIMARY KEY ASC,
+                           firstname TEXT NOT NULL,
+                           lastname TEXT,
+                           UNIQUE(firstname, lastname));""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
                            FOREIGN KEY(person_id) REFERENCES persons(id),
