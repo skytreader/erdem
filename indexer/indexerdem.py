@@ -44,7 +44,7 @@ class Indexerdem(object):
         elif isinstance(faker_listings, OrderedDict):
             return set(faker_listings.keys())
         else:
-            raise TypeError("We only know how to operate with OrderedDicts or tuples. Given: %s" % type(faker_listings))
+            raise TypeError("We can only operate with OrderedDicts or tuples. Given: %s" % type(faker_listings))
 
     def init(self):
         cursor = self.conn.cursor()
@@ -95,6 +95,11 @@ class Indexerdem(object):
                         names.append((sanitized, None))
                 else:
                     names.append((sanitized, None))
+            elif sanitized in self.last_names:
+                backward = i - 1
+                if backward >= 0:
+                    if hayparse[backward] in self.first_names_female:
+                        names.append((hayparse[backward], sanitized))
 
             i += 1
         
