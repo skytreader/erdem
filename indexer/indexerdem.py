@@ -67,12 +67,22 @@ class Indexerdem(object):
         spam = filename.rsplit(".", 1)
         return spam[0].replace("&", "and")
 
-    def __find_names(self, haystack: str) -> Iterable[Tuple[str]]:
+    def __find_names(self, haystack: str) -> Iterable[
+        Union[
+            Tuple[str, Optional[str], bool],
+            Tuple[str, Optional[str]]
+        ]
+    ]:
         def sanitize(s: str) -> str:
             return "".join([c for c in s if str.isalpha(c)]).title()
 
         hayparse: List[str] = NONWORD.split(haystack)
-        names: List[Tuple[str]] = []
+        names: List[
+            Union[
+                Tuple[str, Optional[str]],
+                Tuple[str, Optional[str], bool]
+            ]
+        ] = []
         i = 0
         limit = len(hayparse)
 
@@ -98,8 +108,7 @@ class Indexerdem(object):
             elif sanitized in self.last_names:
                 backward = i - 1
                 if backward >= 0:
-                    if hayparse[backward] in self.first_names_female:
-                        names.append((hayparse[backward], sanitized))
+                   names.append((hayparse[backward], sanitized))
 
             i += 1
         
@@ -138,7 +147,7 @@ class Indexerdem(object):
                         (person_id, file_id, certainty)
                     )
                 else:
-                    logger.error("Found an odd name: %s" % name)
+                    logger.error("Found an odd name: %s" % str(name))
 
         except:
             logger.exception("Ran into some problems...")
