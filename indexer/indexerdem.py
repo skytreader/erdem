@@ -24,12 +24,13 @@ logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-NameTuple = Tuple[str, Optional[str], NameDecisionRule]
-
 class NameDecisionRule(Enum):
     ALMOST_CERTAIN = "almost-certain"
+    TRUNCATED_FIRSTNAME = "truncated-firstname"
     LASTNAME_BACKWARD = "lastname-backward"
-    HARDMAPPED = "hardmapped"
+    MANUAL_INPUT = "manual-input"
+
+NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 
 class Indexerdem(object):
 
@@ -64,6 +65,7 @@ class Indexerdem(object):
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
                            lastname TEXT,
+                           extraction_rule TEXT NOT NULL,
                            UNIQUE(firstname, lastname));""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
@@ -75,11 +77,9 @@ class Indexerdem(object):
         spam = filename.rsplit(".", 1)
         return spam[0].replace("&", "and")
 
-    def __find_names(self, haystack: str) -> Iterable[
-        Tuple[str, Optional[str], NameDecisionRule]
-    ]:
+    def __find_names(self, haystack: str) -> Iterable[NameTuple]:
         hayparse: List[str] = NONWORD.split(haystack)
-        names: List[Tuple[str, Optional[str], NameDecisionRule]] = []
+        names: List[NameTuple] = []
         i = 0
         limit = len(hayparse)
 
@@ -94,17 +94,17 @@ class Indexerdem(object):
                 forward = i + 1
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
-                        names.append((word, hayparse[forward]))
+                        names.append((word, hayparse[forward], NameDecisionRule.ALMOST_CERTAIN))
                         i = forward
                         continue
                     else:
-                        names.append((word, None))
+                        names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
                 else:
-                    names.append((word, None))
+                    names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
             elif word in self.last_names:
                 backward = i - 1
                 if backward >= 0:
-                   names.append((hayparse[backward], word))
+                   names.append((hayparse[backward], word, NameDecisionRule.LASTNAME_BACKWARD))
 
             i += 1
         
@@ -123,10 +123,7 @@ class Indexerdem(object):
 
     def index(self, filename: str) -> None:
         def decide_certainty(nametpl: NameTuple) -> bool:
-            if len(nametpl) == 3:
-                return nametpl[2] # type: ignore
-            else:
-                return nametpl[1] is not None
+            return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
         try:
             cleaned = self.__normalize_filename(filename)
@@ -136,11 +133,11 @@ class Indexerdem(object):
             names = self.__find_names(cleaned)
 
             for name in names:
-                if len(name) == 2:
+                if len(name) == 3:
                     person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
                     if person_id is None:
-                        logger.info("Inserting %s because person_id is %s" % (str(name), person_id))
-                        cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
+                        person = (name[0], name[1], name[2].value)
+                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule) VALUES (?, ?, ?)", person)
                         person_id = cursor.lastrowid
 
                     certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE
@@ -154,7 +151,6 @@ class Indexerdem(object):
         except:
             logger.exception("Ran into some problems...")
         finally:
-            logger.info("committing...")
             self.conn.commit()
 
     def readdir(self, dirpath: str) -> None:
