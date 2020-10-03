@@ -70,7 +70,8 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
                            FOREIGN KEY(person_id) REFERENCES persons(id),
-                           FOREIGN KEY(file_id) REFERENCES files(id))""".format(is_certain_default=Indexerdem.SQLITE_TRUE))
+                           FOREIGN KEY(file_id) REFERENCES files(id),
+                           UNIQUE(person_id, file_id))""".format(is_certain_default=Indexerdem.SQLITE_TRUE))
         self.conn.commit()
 
     def __normalize_filename(self, filename: str) -> str:
@@ -95,7 +96,7 @@ class Indexerdem(object):
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
                         names.append((word, hayparse[forward], NameDecisionRule.ALMOST_CERTAIN))
-                        i = forward
+                        i = forward + 1
                         continue
                     else:
                         names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
@@ -105,6 +106,7 @@ class Indexerdem(object):
                 backward = i - 1
                 if backward >= 0:
                    names.append((hayparse[backward], word, NameDecisionRule.LASTNAME_BACKWARD))
+
 
             i += 1
         
@@ -131,6 +133,7 @@ class Indexerdem(object):
             cursor.execute("INSERT INTO files (filename) VALUES (?)", (filename,))
             file_id = cursor.lastrowid
             names = self.__find_names(cleaned)
+            logger.info("'%s' has the ff. names: %s" % (filename, names))
 
             for name in names:
                 if len(name) == 3:
