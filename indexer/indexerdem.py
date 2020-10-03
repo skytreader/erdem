@@ -23,6 +23,11 @@ logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
+NameTuple = Union[
+    Tuple[str, Optional[str], bool],
+    Tuple[str, Optional[str]]
+]
+
 class Indexerdem(object):
 
     SQLITE_TRUE = 1
@@ -34,9 +39,9 @@ class Indexerdem(object):
         self.last_names: Set[str] = set()
         for loc in locales:
             person_providers_module = import_module("faker.providers.person.%s" % loc)
-            self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female)
-            self.last_names |= self.__extract_names(person_providers_module.Provider.last_names)
-            self.last_names |= self.__extract_names(person_providers_module.Provider.first_names_male)
+            self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female) # type: ignore
+            self.last_names |= self.__extract_names(person_providers_module.Provider.last_names) # type: ignore
+            self.last_names |= self.__extract_names(person_providers_module.Provider.first_names_male) # type: ignore
 
     def __extract_names(self, faker_listings: Union[OrderedDict, Tuple]) -> Set[str]:
         if isinstance(faker_listings, tuple):
@@ -126,6 +131,12 @@ class Indexerdem(object):
             return None
 
     def index(self, filename: str) -> None:
+        def decide_certainty(nametpl: NameTuple) -> bool:
+            if len(nametpl) == 3:
+                return nametpl[2] # type: ignore
+            else:
+                return nametpl[1] is not None
+
         try:
             cleaned = self.__normalize_filename(filename)
             cursor = self.conn.cursor()
@@ -141,7 +152,7 @@ class Indexerdem(object):
                         cursor.execute("INSERT INTO persons (firstname, lastname) VALUES (?, ?)", name)
                         person_id = cursor.lastrowid
 
-                    certainty = Indexerdem.SQLITE_TRUE if name[1] is not None else Indexerdem.SQLITE_FALSE
+                    certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE
                     cursor.execute(
                         "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
                         (person_id, file_id, certainty)
