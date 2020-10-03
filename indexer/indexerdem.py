@@ -10,6 +10,7 @@ Assumptions:
 """
 from argparse import ArgumentParser
 from collections import OrderedDict
+from enum import Enum
 from importlib import import_module
 from typing import Iterable, Optional, List, Set, Tuple, Union
 
@@ -23,10 +24,12 @@ logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
-NameTuple = Union[
-    Tuple[str, Optional[str], bool],
-    Tuple[str, Optional[str]]
-]
+NameTuple = Tuple[str, Optional[str], NameDecisionRule]
+
+class NameDecisionRule(Enum):
+    ALMOST_CERTAIN = "almost-certain"
+    LASTNAME_BACKWARD = "lastname-backward"
+    HARDMAPPED = "hardmapped"
 
 class Indexerdem(object):
 
@@ -73,47 +76,35 @@ class Indexerdem(object):
         return spam[0].replace("&", "and")
 
     def __find_names(self, haystack: str) -> Iterable[
-        Union[
-            Tuple[str, Optional[str], bool],
-            Tuple[str, Optional[str]]
-        ]
+        Tuple[str, Optional[str], NameDecisionRule]
     ]:
-        def sanitize(s: str) -> str:
-            return "".join([c for c in s if str.isalpha(c)]).title()
-
         hayparse: List[str] = NONWORD.split(haystack)
-        names: List[
-            Union[
-                Tuple[str, Optional[str]],
-                Tuple[str, Optional[str], bool]
-            ]
-        ] = []
+        names: List[Tuple[str, Optional[str], NameDecisionRule]] = []
         i = 0
         limit = len(hayparse)
 
         while i < limit:
-            word = hayparse[i]
-            sanitized = sanitize(word)
+            word = hayparse[i].title()
 
             # FIXME This assumes names are only two-part. The "reasonable" thing
             # to do would be to consume until we encounter something that isn't
             # a name. However, watch out that sanitation means we lose boundary
             # cues in comma-listed names.
-            if sanitized in self.first_names_female:
+            if word in self.first_names_female:
                 forward = i + 1
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
-                        names.append((sanitized, hayparse[forward]))
+                        names.append((word, hayparse[forward]))
                         i = forward
                         continue
                     else:
-                        names.append((sanitized, None))
+                        names.append((word, None))
                 else:
-                    names.append((sanitized, None))
-            elif sanitized in self.last_names:
+                    names.append((word, None))
+            elif word in self.last_names:
                 backward = i - 1
                 if backward >= 0:
-                   names.append((hayparse[backward], sanitized))
+                   names.append((hayparse[backward], word))
 
             i += 1
         
