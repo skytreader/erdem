@@ -11,6 +11,7 @@
     "@types/react": "^16.9.49",
     "@types/react-dom": "^16.9.8",
     "arwes": "^1.0.0-alpha.5",
+    "aws-sdk": "^2.766.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-scripts": "3.4.3",
@@ -18,7 +19,7 @@
     "typescript": "^3.7.5"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "BROWSER=none react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
