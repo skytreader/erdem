@@ -2,5 +2,7 @@
 
 ## Instructions
 
-Generate an index using the indexer. Save this index into the `frontend`
-directory and run the React app via `npm start`.
+1. Generate ann index using the indexer and save this to the `backend`
+directory.
+2. Run the backend.
+3. Run the React frontend via `npm start`.
