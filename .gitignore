@@ -25,3 +25,5 @@ frontend/yarn-error.log*
 *.db
 *.swp
 __pycache__
+backend/index.js
+*node_modules
