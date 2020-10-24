@@ -15,9 +15,15 @@ app.get("/", (req, res) => {
     });
 });
 
-app.get("/files", async (req, res) => {
-    const rows = await aDbAll("SELECT * FROM files;");
-    return res.json(rows);
+// WARNING: Kids, don't do this in prod!
+app.get("/fetch/:table", async (req, res, next) => {
+    try {
+        const rows = await aDbAll("SELECT * FROM " + req.params.table + ";");
+        return res.json(rows);
+    } catch(error) {
+        console.error("Caught an exception:", error);
+        next(error);
+    }
 });
 
 app.listen(16981, () => {
