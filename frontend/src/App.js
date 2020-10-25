@@ -10,6 +10,10 @@ import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from 'arwes';
 
 class Erdem extends React.Component {
+    
+    componentDidMount() {
+        document.title = "Erdem";
+    }
 
     render() {
         return (
