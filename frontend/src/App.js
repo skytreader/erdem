@@ -20,10 +20,37 @@ class Erdem extends React.Component {
 
     componentDidMount() {
         document.title = "Erdem";
+    }
+
+    render() {
+        return (
+            <ThemeProvider theme={createTheme()}>
+              <Arwes animate show>
+                <Row>
+                  <Col s={0} m={3}></Col>
+                  <Col s={12} m={6}><h1><img src={logo} alt="Erdem Logo" />Erdem</h1></Col>
+                  <Col s={0} m={3}></Col>
+                </Row>
+                <FileList/>
+              </Arwes>
+            </ThemeProvider>
+        )
+    }
+}
+
+class FileList extends React.Component {
+    
+    constructor(props) {
+        super(props);
+        this.state = {
+            mediaItems: []
+        };
+    }
+
+    componentDidMount() {
         fetch("http://localhost:16981/fetch/files")
             .then(res => res.json())
             .then((result) => {
-                console.log(result);
                 this.setState({
                     mediaItems: result
                 });
@@ -34,27 +61,15 @@ class Erdem extends React.Component {
     }
 
     render() {
-        console.log("wat");
-        const mediaItemsRender = this.state.mediaItems.map((file) => (
+        const mediaItems = this.state.mediaItems;
+        console.log("the mediaItems", mediaItems);
+        return mediaItems.map((file) => (
             <Row key={file.id}>
                 <Col s={0} m={3}></Col>
-                <Col s={12} m={6}>{file.name}</Col>
+                <Col s={12} m={6}>{file.filename}</Col>
                 <Col s={0} m={3}></Col>
             </Row>
-        ))
-        console.log(mediaItemsRender);
-        return (
-            <ThemeProvider theme={createTheme()}>
-              <Arwes animate show>
-                <Row>
-                  <Col s={0} m={3}></Col>
-                  <Col s={12} m={6}><h1><img src={logo} alt="Erdem Logo" />Erdem</h1></Col>
-                  <Col s={0} m={3}></Col>
-                </Row>
-                {mediaItemsRender}
-              </Arwes>
-            </ThemeProvider>
-        )
+        ));
     }
 }
 
