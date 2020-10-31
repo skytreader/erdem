@@ -62,7 +62,7 @@ class FileList extends React.Component {
             },
             (error) => {
                 this.setState({
-                    mediaIteams: [],
+                    mediaItems: [],
                     isError: true
                 });
                 console.error("Error occurred", error);
@@ -70,14 +70,20 @@ class FileList extends React.Component {
     }
 
     render() {
-        const mediaItems = this.state.mediaItems;
-        return mediaItems.map((file) => (
-            <Row key={file.id}>
-                <Col s={0} m={3}></Col>
-                <Col s={12} m={6}>{file.filename}</Col>
-                <Col s={0} m={3}></Col>
-            </Row>
-        ));
+        if (this.state.isError) {
+            // TODO Style better.
+            return (
+                <div>Error fetching files. Check server.</div>
+            )
+        } else {
+            return this.state.mediaItems.map((file) => (
+                <Row key={file.id}>
+                    <Col s={0} m={3}></Col>
+                    <Col s={12} m={6}>{file.filename}</Col>
+                    <Col s={0} m={3}></Col>
+                </Row>
+            ));
+        }
     }
 }
 
