@@ -34,6 +34,7 @@ class Erdem extends React.Component {
                 </Row>
                 <Switch>
                   <Route exact path="/" component={FileList}/>
+                  <Route exact path="/participants/:fileid" component={ParticipationList}/>
                 </Switch>
               </Arwes>
             </ThemeProvider>
@@ -79,7 +80,53 @@ class FileList extends React.Component {
             return this.state.mediaItems.map((file) => (
                 <Row key={file.id}>
                     <Col s={0} m={3}></Col>
-                    <Col s={12} m={6}>{file.filename}</Col>
+                    <Col s={12} m={6}><Link to={`/participants/${file.id}`}>{file.filename}</Link></Col>
+                    <Col s={0} m={3}></Col>
+                </Row>
+            ));
+        }
+    }
+}
+
+class ParticipationList extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            participants: [],
+            isError: false
+        };
+    }
+
+    componentDidMount() {
+        fetch("http://localhost:16981/fetch/fileparticipants/" + this.props.match.params.fileid)
+            .then(res => res.json())
+            .then((result) => {
+                this.setState({
+                    participants: result,
+                    isError: false
+                });
+            },
+            (error) => {
+                this.setState({
+                    participants: [],
+                    isError: true
+                });
+                console.error("Error occurred", error);
+            }
+        );
+    }
+
+    render() {
+        if (this.state.isError) {
+            // TODO Style better.
+            return (
+                <div>Error connecting to server.</div>
+            )
+        } else {
+            return this.state.participants.map((record) => (
+                <Row key={record.id}>
+                    <Col s={0} m={3}></Col>
+                    <Col s={12} m={6}>{record.firstname} {record.lastname}</Col>
                     <Col s={0} m={3}></Col>
                 </Row>
             ));
