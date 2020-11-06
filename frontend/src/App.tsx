@@ -1,10 +1,3 @@
-/*
-IMPORTANT: Do not change this file's extension to ts(x) so long as Arwes does
-not have type definitions available.
-
-For some reason, `npm run build` processes this just fine with a .js extension
-(and no Arwes typedefs) but not if you change it to ts(x).
-*/
 import React from "react";
 import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
@@ -12,7 +5,7 @@ import {Switch, Route, Link} from "react-router-dom";
 
 class Erdem extends React.Component {
     
-    constructor(props) {
+    constructor(props: any) {
         super(props);
         this.state = {
             mediaItems: []
@@ -42,9 +35,13 @@ class Erdem extends React.Component {
     }
 }
 
-class FileList extends React.Component {
-    
-    constructor(props) {
+interface FileListState {
+    mediaItems: any[];
+    isError: boolean;
+}
+
+class FileList extends React.Component<any, FileListState> {
+    constructor(props: any) {
         super(props);
         this.state = {
             mediaItems: [],
@@ -88,8 +85,13 @@ class FileList extends React.Component {
     }
 }
 
-class ParticipationList extends React.Component {
-    constructor(props) {
+interface ParticipationListState {
+    participants: any[];
+    isError: boolean;
+}
+
+class ParticipationList extends React.Component<any, ParticipationListState> {
+    constructor(props: any) {
         super(props);
         this.state = {
             participants: [],
