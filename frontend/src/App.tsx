@@ -124,15 +124,26 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
             return (
                 <div>Error connecting to server.</div>
             )
-        } else {
-            return this.state.participants.map((record) => (
-                <Row key={record.id}>
-                    <Col s={0} m={3}></Col>
-                    <Col s={12} m={6}>{record.firstname} {record.lastname}</Col>
-                    <Col s={0} m={3}></Col>
-                </Row>
-            ));
+        } else if (this.state.participants.length > 0) {
+            return [
+                (
+                    <Row>
+                        <Col s={0} m={3}></Col>
+                        <Col s={12} m={6}>
+                            Participants in <strong>{this.state.participants[0].filename}</strong>
+                        </Col>
+                    </Row>
+                ),
+                this.state.participants.map((record) => (
+                    <Row key={record.id}>
+                        <Col s={0} m={3}></Col>
+                        <Col s={12} m={6}>{record.firstname} {record.lastname}</Col>
+                        <Col s={0} m={3}></Col>
+                    </Row>
+                ))
+            ];
         }
+        return null;
     }
 }
 
