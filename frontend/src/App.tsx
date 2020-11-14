@@ -3,6 +3,8 @@ import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
 import {Switch, Route, Link} from "react-router-dom";
 
+import {erdemCentered} from "./utils";
+
 class Erdem extends React.Component {
     
     constructor(props: any) {
@@ -23,7 +25,6 @@ class Erdem extends React.Component {
                 <Row>
                   <Col s={0} m={3}></Col>
                   <Col s={12} m={6}><h1><img src={logo} alt="Erdem Logo" />Erdem</h1></Col>
-                  <Col s={0} m={3}></Col>
                 </Row>
                 <Switch>
                   <Route exact path="/" component={FileList}/>
@@ -136,9 +137,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                 ),
                 this.state.participants.map((record) => (
                     <Row key={record.id}>
-                        <Col s={0} m={3}></Col>
-                        <Col s={12} m={6}>{record.firstname} {record.lastname}</Col>
-                        <Col s={0} m={3}></Col>
+                        {erdemCentered(record.firstname + " " + record.lastname)}
                     </Row>
                 ))
             ];
