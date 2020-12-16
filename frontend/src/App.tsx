@@ -24,7 +24,7 @@ class Erdem extends React.Component {
               <Arwes animate show>
                 <Row>
                   <Col s={0} m={3}></Col>
-                  <Col s={12} m={6}><h1><img src={logo} alt="Erdem Logo" />Erdem</h1></Col>
+                  <Col s={12} m={6}><h1><a href="/" className="logo"><img src={logo} alt="Erdem Logo" />Erdem</a></h1></Col>
                 </Row>
                 <Switch>
                   <Route exact path="/" component={FileList}/>
@@ -36,8 +36,13 @@ class Erdem extends React.Component {
     }
 }
 
+interface MediaItem {
+    filename: string;
+    id: number;
+}
+
 interface FileListState {
-    mediaItems: any[];
+    mediaItems: MediaItem[];
     isError: boolean;
 }
 
@@ -55,7 +60,18 @@ class FileList extends React.Component<any, FileListState> {
             .then(res => res.json())
             .then((result) => {
                 this.setState({
-                    mediaItems: result,
+                    mediaItems: result.sort((a: MediaItem, b: MediaItem) => {
+                        var normA = a.filename.toUpperCase();
+                        var normB = b.filename.toUpperCase();
+
+                        if (normA < normB) {
+                            return -1;
+                        } else if (normA > normB) {
+                            return 1;
+                        } else {
+                            return 0;
+                        }
+                    }),
                     isError: false
                 });
             },
