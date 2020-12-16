@@ -31,9 +31,20 @@ app.get("/fetch/:table", async (req, res, next) => {
 });
 
 app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
-    console.log("/fetch/persons_in_filename/", req.params.fileid);
+    console.log("/fetch/fileparticipants/", req.params.fileid);
     try {
         const rows = await aDbAll("SELECT persons.id, persons.firstname, persons.lastname, files.filename FROM persons, participation, files WHERE participation.file_id=" + req.params.fileid + " AND participation.person_id=persons.id AND participation.file_id=files.id;");
+        return res.json(rows);
+    } catch(error) {
+        console.error("Caught an exception:", error);
+        next(error);
+    }
+});
+
+app.get("/fetch/files/:personid", async (req, res, next) => {
+    console.log("/fetch/files", req.params.personid);
+    try{
+        const rows = await aDbAll("SELECT files.id, files.filename, persons.id, persons.firstname, persons.lastname FROM files, participation, persons WHERE participation.file_id=files.id AND participation.person_id=" + req.params.personid + " AND persons.id=participation.person_id");
         return res.json(rows);
     } catch(error) {
         console.error("Caught an exception:", error);
