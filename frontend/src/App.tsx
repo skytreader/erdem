@@ -29,6 +29,7 @@ class Erdem extends React.Component {
                 <Switch>
                   <Route exact path="/" component={FileList}/>
                   <Route exact path="/participants/:fileid" component={ParticipationList}/>
+                  <Route exact path="/performances/:personid" component={PerformanceList}/>
                 </Switch>
               </Arwes>
             </ThemeProvider>
@@ -102,6 +103,12 @@ class FileList extends React.Component<any, FileListState> {
     }
 }
 
+interface PersonRecord {
+    id: number;
+    firstname: string;
+    lastname: string;
+}
+
 interface ParticipationListState {
     participants: any[];
     isError: boolean;
@@ -131,8 +138,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                     isError: true
                 });
                 console.error("Error occurred", error);
-            }
-        );
+            });
     }
 
     render() {
@@ -151,7 +157,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                         </Col>
                     </Row>
                 ),
-                this.state.participants.map((record) => (
+                this.state.participants.map((record: PersonRecord) => (
                     <Row key={record.id}>
                         {erdemCentered(record.firstname + " " + record.lastname)}
                     </Row>
@@ -159,6 +165,62 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
             ];
         }
         return null;
+    }
+}
+
+interface PerformanceListState {
+    performances: any[];
+    isError: boolean;
+}
+
+class PerformanceList extends React.Component<any, PerformanceListState> {
+    constructor(props: any) {
+        super(props);
+        this.state = {
+            performances: [],
+            isError: false
+        }
+    }
+
+    componentDidMount() {
+        fetch("http://localhost:16981/fetch/files/" + this.props.match.parmas.personid)
+            .then(res => res.json())
+            .then((result) => {
+                this.setState({
+                    performances: result,
+                    isError: false
+                });
+            },
+            (error) => {
+                this.setState({
+                    performances: [],
+                    isError: true
+                });
+            });
+    }
+
+    render() {
+        if (this.state.isError) {
+            return (
+                <div>Error connecting to server.</div>
+            )
+        } else if (this.state.performances.length > 0) {
+            const sample = this.state.performances[0];
+            const name = sample.firstname + " " + sample.lastname;
+//{erdemCentered((<Link to={`/performances/${record.fileid}`}>record.filename</Link>))}
+            return [
+                (
+                    <Row>
+                        {erdemCentered("Performances of " + name)}
+                    </Row>
+                ),
+                this.state.performances.map((record) => (
+                    <Row key={record.fileid}>
+                        {erdemCentered(record.filename)}
+                    </Row>
+                ))
+            ];
+        }
     }
 }
 
