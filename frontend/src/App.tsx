@@ -1,5 +1,4 @@
 import React from "react";
-import ReactDOMServer from "react-dom/server";
 import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
 import {BrowserRouter, Switch, Route, Link} from "react-router-dom";
@@ -182,19 +181,21 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
         this.state = {
             performances: [],
             isError: false
-        }
+        };
     }
 
     componentDidMount() {
-        fetch("http://localhost:16981/fetch/files/" + this.props.match.parmas.personid)
+        fetch("http://localhost:16981/fetch/files/" + this.props.match.params.personid)
             .then(res => res.json())
             .then((result) => {
+                console.log("CHAD", result);
                 this.setState({
                     performances: result,
                     isError: false
                 });
             },
             (error) => {
+                console.error("request error", error);
                 this.setState({
                     performances: [],
                     isError: true
@@ -203,6 +204,7 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
     }
 
     render() {
+        console.log("render", this.state);
         if (this.state.isError) {
             return (
                 <div>Error connecting to server.</div>
@@ -228,6 +230,7 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
                 )
             ];
         }
+        return null;
     }
 }
 
