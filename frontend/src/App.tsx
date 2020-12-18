@@ -1,7 +1,8 @@
 import React from "react";
+import ReactDOMServer from "react-dom/server";
 import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
-import {Switch, Route, Link} from "react-router-dom";
+import {BrowserRouter, Switch, Route, Link} from "react-router-dom";
 
 import {erdemCentered} from "./utils";
 
@@ -20,19 +21,21 @@ class Erdem extends React.Component {
 
     render() {
         return (
-            <ThemeProvider theme={createTheme()}>
-              <Arwes animate show>
-                <Row>
-                  <Col s={0} m={3}></Col>
-                  <Col s={12} m={6}><h1><a href="/" className="logo"><img src={logo} alt="Erdem Logo" />Erdem</a></h1></Col>
-                </Row>
-                <Switch>
-                  <Route exact path="/" component={FileList}/>
-                  <Route exact path="/participants/:fileid" component={ParticipationList}/>
-                  <Route exact path="/performances/:personid" component={PerformanceList}/>
-                </Switch>
-              </Arwes>
-            </ThemeProvider>
+            <BrowserRouter>
+              <ThemeProvider theme={createTheme()}>
+                <Arwes animate show>
+                  <Row>
+                    <Col s={0} m={3}></Col>
+                    <Col s={12} m={6}><h1><a href="/" className="logo"><img src={logo} alt="Erdem Logo" />Erdem</a></h1></Col>
+                  </Row>
+                  <Switch>
+                    <Route exact path="/" component={FileList}/>
+                    <Route exact path="/participants/:fileid" component={ParticipationList}/>
+                    <Route exact path="/performances/:personid" component={PerformanceList}/>
+                  </Switch>
+                </Arwes>
+              </ThemeProvider>
+            </BrowserRouter>
         )
     }
 }
@@ -159,7 +162,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                 ),
                 this.state.participants.map((record: PersonRecord) => (
                     <Row key={record.id}>
-                        {erdemCentered(record.firstname + " " + record.lastname)}
+                        {erdemCentered((<BrowserRouter><Link to={`/performances/${record.id}`}>{`${record.firstname} ${record.lastname}`}</Link></BrowserRouter>))}
                     </Row>
                 ))
             ];
@@ -214,11 +217,15 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
                         {erdemCentered("Performances of " + name)}
                     </Row>
                 ),
-                this.state.performances.map((record) => (
-                    <Row key={record.fileid}>
-                        {erdemCentered(record.filename)}
-                    </Row>
-                ))
+                (
+                    <BrowserRouter>
+                        {this.state.performances.map((record) => (
+                            <Row key={record.fileid}>
+                                {erdemCentered(record.filename)}
+                            </Row>
+                        ))}
+                    </BrowserRouter>
+                )
             ];
         }
     }

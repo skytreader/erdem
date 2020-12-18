@@ -3,12 +3,9 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import Erdem from './App';
 import * as serviceWorker from './serviceWorker';
-import {BrowserRouter} from "react-router-dom";
 
 ReactDOM.render(
-  <BrowserRouter>
-    <Erdem />
-  </BrowserRouter>,
+  <Erdem />,
   document.getElementById('root')
 );
 
