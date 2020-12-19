@@ -1,7 +1,7 @@
 import React from "react";
 import logo from "./img/erdem-logo.png";
 import {ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
-import {BrowserRouter, Switch, Route, Link} from "react-router-dom";
+import {BrowserRouter, Switch, Route, Link, withRouter} from "react-router-dom";
 
 import {erdemCentered} from "./utils";
 
@@ -29,8 +29,8 @@ class Erdem extends React.Component {
                   </Row>
                   <Switch>
                     <Route exact path="/" component={FileList}/>
-                    <Route exact path="/participants/:fileid" component={ParticipationList}/>
-                    <Route exact path="/performances/:personid" component={PerformanceList}/>
+                    <Route exact path="/participants/:fileid" component={withRouter(ParticipationList)}/>
+                    <Route exact path="/performances/:personid" component={withRouter(PerformanceList)}/>
                   </Switch>
                 </Arwes>
               </ThemeProvider>
@@ -161,7 +161,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                 ),
                 this.state.participants.map((record: PersonRecord) => (
                     <Row key={record.id}>
-                        {erdemCentered((<BrowserRouter><Link to={`/performances/${record.id}`}>{`${record.firstname} ${record.lastname}`}</Link></BrowserRouter>))}
+                        {erdemCentered((<Link to={`/performances/${record.id}`}>{`${record.firstname} ${record.lastname}`}</Link>))}
                     </Row>
                 ))
             ];
@@ -219,15 +219,11 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
                         {erdemCentered("Performances of " + name)}
                     </Row>
                 ),
-                (
-                    <BrowserRouter>
-                        {this.state.performances.map((record) => (
-                            <Row key={record.fileid}>
-                                {erdemCentered(record.filename)}
-                            </Row>
-                        ))}
-                    </BrowserRouter>
-                )
+                this.state.performances.map((record) => (
+                    <Row key={record.fileid}>
+                        {erdemCentered((<Link to={`/participants/${record.id}`}>{`${record.filename}`}</Link>))}
+                    </Row>
+                ))
             ];
         }
         return null;
