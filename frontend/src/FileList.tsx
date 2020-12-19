@@ -1,6 +1,7 @@
 import React from "react";
-import {Row, Col} from "arwes";
+import {Row} from "arwes";
 import {Link} from "react-router-dom";
+import {erdemCentered} from "./utils";
 
 interface MediaItem {
     filename: string;
@@ -59,9 +60,7 @@ class FileList extends React.Component<any, FileListState> {
         } else {
             return this.state.mediaItems.map((file) => (
                 <Row key={file.id}>
-                    <Col s={0} m={3}></Col>
-                    <Col s={12} m={6}><Link to={`/participants/${file.id}`}>{file.filename}</Link></Col>
-                    <Col s={0} m={3}></Col>
+                    {erdemCentered((<Link to={`/participants/${file.id}`}>{file.filename}</Link>))}
                 </Row>
             ));
         }
