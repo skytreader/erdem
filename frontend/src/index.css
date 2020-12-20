@@ -20,3 +20,8 @@ code {
 .tab {
     width: 100%;
 }
+
+.selected {
+    text-shadow: 1px 1px 12px #acf9fb;
+    font-weight: bold;
+}
