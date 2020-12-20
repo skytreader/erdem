@@ -52,7 +52,7 @@ class PerformerList extends React.Component<any, PerformerListState> {
         } else {
             return this.state.performers.map((performer) => (
                 <Row key={performer.id}>
-                    {erdemCentered((<Link to={`/participants/${performer.id}`}>{this.makeName(performer)}</Link>))}
+                    {erdemCentered((<Link to={`/performances/${performer.id}`}>{this.makeName(performer)}</Link>))}
                 </Row>
             ));
         }
