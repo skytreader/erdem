@@ -24,8 +24,8 @@ class ListToggle extends React.Component<any, ListToggleState> {
         const page = [
             (
                 <Row>
-                    <Col s={6} m={3} offset={["s0", "m3"]}><Button className="tab">Files</Button></Col>
-                    <Col s={6} m={3}><Button className="tab">Performers</Button></Col>
+                    <Col s={6} m={3} offset={["s0", "m3"]}><Button className="tab" onClick={() => this.toggle("performers")}>Performers</Button></Col>
+                    <Col s={6} m={3}><Button className="tab" onClick={() => this.toggle("files")}>Files</Button></Col>
                 </Row>
             ),
         ]
