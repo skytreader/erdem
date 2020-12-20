@@ -45,7 +45,6 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
         } else if (this.state.performances.length > 0) {
             const sample = this.state.performances[0];
             const name = sample.firstname + " " + sample.lastname;
-//{erdemCentered((<Link to={`/performances/${record.fileid}`}>record.filename</Link>))}
             return [
                 (
                     <Row>

@@ -16,3 +16,7 @@ code {
     text-decoration: none;
     color: #fff;
 }
+
+.tab {
+    padding: 3px inherit;
+}

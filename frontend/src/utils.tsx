@@ -3,8 +3,7 @@ import {Col} from "arwes";
 
 export function erdemCentered(text: any): any {
     return [
-        <Col s={0} m={3}></Col>,
-        <Col s={12} m={6}>{text}</Col>
+        <Col s={12} m={6} offset={["s0", "m3"]}>{text}</Col>
     ];
 }
 

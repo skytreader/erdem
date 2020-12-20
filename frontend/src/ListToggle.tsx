@@ -1,5 +1,5 @@
 import React from "react";
-import {Row, Col} from "arwes";
+import {Button, Row, Col} from "arwes";
 import FileList from "./FileList";
 
 interface ListToggleState {
@@ -15,12 +15,15 @@ class ListToggle extends React.Component<any, ListToggleState> {
         };
     }
 
+    toggle(s: string) {
+        this.setState({isPerformerList: s === "performers"});
+    }
+
     render() {
         return (
             <Row>
-                <Col s={0} m={3}></Col>
-                <Col s={6} m={4}>Files</Col>
-                <Col s={6} m={4}>Performers</Col>
+                <Col s={6} m={3} className="tab" offset={["s0", "m3"]}><Button>Files</Button></Col>
+                <Col s={6} m={3} className="tab"><Button>Performers</Button></Col>
                 <FileList/>
             </Row>
         )
