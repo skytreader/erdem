@@ -20,13 +20,15 @@ class ListToggle extends React.Component<any, ListToggleState> {
     }
 
     render() {
-        return (
-            <Row>
-                <Col s={6} m={3} className="tab" offset={["s0", "m3"]}><Button>Files</Button></Col>
-                <Col s={6} m={3} className="tab"><Button>Performers</Button></Col>
-                <FileList/>
-            </Row>
-        )
+        return [
+            (
+                <Row>
+                    <Col s={6} m={3} offset={["s0", "m3"]}><Button className="tab">Files</Button></Col>
+                    <Col s={6} m={3}><Button className="tab">Performers</Button></Col>
+                </Row>
+            ),
+            (<FileList/>)
+        ]
     }
 }
 
