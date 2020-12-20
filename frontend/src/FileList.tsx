@@ -48,7 +48,7 @@ class FileList extends React.Component<any, FileListState> {
                     isError: true
                 });
                 console.error("Error occurred", error);
-        });
+            });
     }
 
     render() {
