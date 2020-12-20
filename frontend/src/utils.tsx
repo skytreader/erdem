@@ -7,3 +7,16 @@ export function erdemCentered(text: any): any {
     ];
 }
 
+export interface PerformerItem {
+    id: number;
+    firstname: string;
+    lastname: string;
+}
+
+export function makeName(record: PerformerItem): string {
+    if (record.lastname != null) {
+        return record.firstname + " " + record.lastname;
+    } else {
+        return record.firstname;
+    }
+}

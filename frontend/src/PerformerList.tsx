@@ -1,13 +1,7 @@
 import React from "react";
 import {Row} from "arwes";
 import {Link} from "react-router-dom";
-import {erdemCentered} from "./utils";
-
-interface PerformerItem {
-    id: number;
-    firstname: string;
-    lastname: string;
-}
+import {erdemCentered, makeName, PerformerItem} from "./utils";
 
 interface PerformerListState {
     performers: PerformerItem[];
@@ -52,14 +46,10 @@ class PerformerList extends React.Component<any, PerformerListState> {
         } else {
             return this.state.performers.map((performer) => (
                 <Row key={performer.id}>
-                    {erdemCentered((<Link to={`/performances/${performer.id}`}>{this.makeName(performer)}</Link>))}
+                    {erdemCentered((<Link to={`/performances/${performer.id}`}>{makeName(performer)}</Link>))}
                 </Row>
             ));
         }
-    }
-
-    private makeName(record: PerformerItem) {
-        return record.firstname + " " + record.lastname;
     }
 }
 

@@ -1,13 +1,7 @@
 import React from "react";
 import {Row, Col} from "arwes";
 import {Link} from "react-router-dom";
-import {erdemCentered} from "./utils";
-
-interface PersonRecord {
-    id: number;
-    firstname: string;
-    lastname: string;
-}
+import {erdemCentered, makeName, PerformerItem} from "./utils";
 
 interface ParticipationListState {
     participants: any[];
@@ -57,9 +51,9 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                         </Col>
                     </Row>
                 ),
-                this.state.participants.map((record: PersonRecord) => (
+                this.state.participants.map((record: PerformerItem) => (
                     <Row key={record.id}>
-                        {erdemCentered((<Link to={`/performances/${record.id}`}>{`${record.firstname} ${record.lastname}`}</Link>))}
+                        {erdemCentered((<Link to={`/performances/${record.id}`}>{makeName(record)}</Link>))}
                     </Row>
                 ))
             ];
