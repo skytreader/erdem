@@ -37,10 +37,11 @@ class Indexerdem(object):
     SQLITE_TRUE = 1
     SQLITE_FALSE = 0
 
-    def __init__(self, index_filename: str, locales: Iterable[str]):
+    def __init__(self, index_filename: str, locales: Iterable[str], extensions: Iterable[str]):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
+        self.extensions: Set[str] = set(extensions)
         for loc in locales:
             person_providers_module = import_module("faker.providers.person.%s" % loc)
             self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female) # type: ignore
@@ -158,12 +159,16 @@ class Indexerdem(object):
         finally:
             self.conn.commit()
 
+    def __get_ext(self, fname: str) -> str:
+        return fname.rsplit(".", 1)[1]
+
     def readdir(self, dirpath: str) -> None:
         try:
             for root, dirs, files in os.walk(dirpath):
                 for _file in files:
-                    logger.info("processing %s" % _file)
-                    self.index(_file, root)
+                    if self.__get_ext(_file) in self.extensions:
+                        logger.info("processing %s" % _file)
+                        self.index(_file, root)
         except:
             logger.exception("Ran into some problems...")
         finally:
@@ -180,6 +185,6 @@ if __name__ == "__main__":
         help="Comma-separated list of locales that we will use to detect names."
     )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem("cache.db", args["locales"].split(","))
+    indexer: Indexerdem = Indexerdem("cache.db", args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
     indexer.init()
     indexer.readdir(args["filepath"])
