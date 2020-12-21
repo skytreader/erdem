@@ -22,9 +22,19 @@ class PerformerList extends React.Component<any, PerformerListState> {
         fetch("http://localhost:16981/fetch/persons")
             .then(res => res.json())
             .then((result) => {
-                // TODO SORT!
                 this.setState({
-                    performers: result,
+                    performers: result.sort((a: PerformerItem, b: PerformerItem) => {
+                        var normA = makeName(a).toUpperCase();
+                        var normB = makeName(b).toUpperCase();
+
+                        if (normA < normB) {
+                            return -1;
+                        } else if (normA > normB) {
+                            return 1;
+                        } else {
+                            return 0;
+                        }
+                    }),
                     isError: false
                 });
             },
