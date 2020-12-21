@@ -1,7 +1,7 @@
 import React from "react";
 import {Row} from "arwes";
 import {Link} from "react-router-dom";
-import {erdemCentered} from "./utils";
+import {erdemCentered, makeName} from "./utils";
 
 interface PerformanceListState {
     performances: any[];
@@ -44,7 +44,7 @@ class PerformanceList extends React.Component<any, PerformanceListState> {
             )
         } else if (this.state.performances.length > 0) {
             const sample = this.state.performances[0];
-            const name = sample.firstname + " " + sample.lastname;
+            const name = makeName(sample);
             return [
                 (
                     <Row>
