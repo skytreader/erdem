@@ -60,7 +60,9 @@ class Indexerdem(object):
 
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
-                          (id INTEGER PRIMARY KEY ASC, filename TEXT UNIQUE NOT NULL);""")
+                          (id INTEGER PRIMARY KEY ASC,
+                           filename TEXT UNIQUE NOT NULL,
+                           fullpath TEXT NOT NULL);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
@@ -123,14 +125,14 @@ class Indexerdem(object):
         else:
             return None
 
-    def index(self, filename: str) -> None:
+    def index(self, filename: str, fullpath: str) -> None:
         def decide_certainty(nametpl: NameTuple) -> bool:
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
         try:
             cleaned = self.__normalize_filename(filename)
             cursor = self.conn.cursor()
-            cursor.execute("INSERT INTO files (filename) VALUES (?)", (filename,))
+            cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
             file_id = cursor.lastrowid
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
@@ -161,7 +163,7 @@ class Indexerdem(object):
             for root, dirs, files in os.walk(dirpath):
                 for _file in files:
                     logger.info("processing %s" % _file)
-                    self.index(_file)
+                    self.index(_file, root)
         except:
             logger.exception("Ran into some problems...")
         finally:
