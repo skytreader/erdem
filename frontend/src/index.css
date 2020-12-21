@@ -12,6 +12,11 @@ code {
     monospace;
 }
 
+a {
+    text-shadow: 1px 1px 12px #acf9fb;
+    color: #acf9fb;
+}
+
 .logo {
     text-decoration: none;
     color: #fff;
