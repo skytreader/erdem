@@ -15,6 +15,8 @@ class Erdem extends React.Component<any, any> {
         this.state = {
             searchQuery: ""
         };
+
+        this.handleQueryTyped = this.handleQueryTyped.bind(this);
     }
 
     componentDidMount() {

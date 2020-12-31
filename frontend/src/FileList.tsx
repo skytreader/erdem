@@ -73,7 +73,7 @@ export class FileList extends React.Component<any, FileListState> {
 
 export class SearchResults extends FileList {
     componentDidMount() {
-        this.fetchFromSource("http://localhost:16981/fetch/search" + this.props.match.params.query);
+        this.fetchFromSource("http://localhost:16981/fetch/search/" + this.props.match.params.query);
     }
 }
 
