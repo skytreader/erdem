@@ -1,4 +1,5 @@
 import React from "react";
+import erdemHistory from "./erdemHistory";
 import logo from "./img/erdem-logo.png";
 import {Button, ThemeProvider, createTheme, Arwes, Row, Col} from "arwes";
 import {BrowserRouter, Switch, Route, withRouter} from "react-router-dom";
@@ -12,12 +13,16 @@ class Erdem extends React.Component {
     constructor(props: any) {
         super(props);
         this.state = {
-            mediaItems: []
+            searchQuery: ""
         };
     }
 
     componentDidMount() {
         document.title = "Erdem";
+    }
+
+    handleQueryTyped(event: any) {
+        this.setState({searchQuery: event.target.value});
     }
 
     render() {
@@ -35,7 +40,11 @@ class Erdem extends React.Component {
                       <input className="fullwidth" type="text" placeholder="Query"/>
                     </Col>
                     <Col s={0} m={1}>
-                        <Button className="fullwidth">Search</Button>
+                      withRouter(({ erdemHistory }) => (
+                        <Button className="fullwidth" onClick={() => {erdemHistory.push("/search")}}>
+                        Search
+                        </Button>
+                      ))
                     </Col>
                   </Row>
                   <Switch>
