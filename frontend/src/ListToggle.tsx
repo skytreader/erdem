@@ -25,12 +25,12 @@ class ListToggle extends React.Component<any, ListToggleState> {
             (
                 <Row>
                     <Col s={6} m={3} offset={["s0", "m3"]}>
-                        <Button className="tab" onClick={() => this.toggle("performers")}>
+                        <Button className="fullwidth" onClick={() => this.toggle("performers")}>
                             <span className={this.state.isPerformerList ? "selected" : ""}>Performers</span>
                         </Button>
                     </Col>
                     <Col s={6} m={3}>
-                        <Button className="tab" onClick={() => this.toggle("files")}>
+                        <Button className="fullwidth" onClick={() => this.toggle("files")}>
                             <span className={this.state.isPerformerList ? "" : "selected"}>Files</span>
                         </Button>
                     </Col>

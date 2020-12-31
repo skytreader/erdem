@@ -3,7 +3,7 @@ import {Row} from "arwes";
 import {Link} from "react-router-dom";
 import {erdemCentered} from "./utils";
 
-interface MediaItem {
+export interface MediaItem {
     filename: string;
     id: number;
 }
@@ -13,7 +13,7 @@ interface FileListState {
     isError: boolean;
 }
 
-class FileList extends React.Component<any, FileListState> {
+export class FileList extends React.Component<any, FileListState> {
     constructor(props: any) {
         super(props);
         this.state = {
@@ -22,8 +22,8 @@ class FileList extends React.Component<any, FileListState> {
         };
     }
 
-    componentDidMount() {
-        fetch("http://localhost:16981/fetch/files")
+    public fetchFromSource(src: string): void {
+        fetch(src)
             .then(res => res.json())
             .then((result) => {
                 this.setState({
@@ -51,6 +51,10 @@ class FileList extends React.Component<any, FileListState> {
             });
     }
 
+    componentDidMount() {
+        this.fetchFromSource("http://localhost:16981/fetch/files");
+    }
+
     render() {
         if (this.state.isError) {
             // TODO Style better.
@@ -64,6 +68,12 @@ class FileList extends React.Component<any, FileListState> {
                 </Row>
             ));
         }
+    }
+}
+
+export class SearchResults extends FileList {
+    componentDidMount() {
+        this.fetchFromSource("http://localhost:16981/fetch/search" + this.props.match.params.query);
     }
 }
 

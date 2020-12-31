@@ -30,6 +30,17 @@ app.get("/fetch/:table", async (req, res, next) => {
     }
 });
 
+app.get("/fetch/search/:query", async (req, res, next) => {
+    console.log("/fetch/search/", req.params.query);
+    try {
+        const rows = await aDbAll("SELECT id, filename FROM files WHERE filename LIKE '%" + req.params.query + "%';");
+        return res.json(rows);
+    } catch(error) {
+        console.error("Caught an exception:", error);
+        next(error);
+    }
+});
+
 app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
     console.log("/fetch/fileparticipants/", req.params.fileid);
     try {
