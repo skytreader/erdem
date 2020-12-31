@@ -8,7 +8,7 @@ import ParticipationList from "./ParticipationList";
 import PerformanceList from "./PerformanceList";
 import {SearchResults} from "./FileList";
 
-class Erdem extends React.Component {
+class Erdem extends React.Component<any, any> {
     
     constructor(props: any) {
         super(props);
@@ -37,14 +37,12 @@ class Erdem extends React.Component {
                   <Row>
                     <Col s={0} m={3}></Col>
                     <Col s={6} m={5}>
-                      <input className="fullwidth" type="text" placeholder="Query"/>
+                      <input className="fullwidth" type="text" placeholder="Query" value={this.state.searchQuery} onChange={this.handleQueryTyped}/>
                     </Col>
                     <Col s={0} m={1}>
-                      withRouter(({ erdemHistory }) => (
-                        <Button className="fullwidth" onClick={() => {erdemHistory.push("/search")}}>
-                        Search
-                        </Button>
-                      ))
+                      <Button className="fullwidth" onClick={() => {erdemHistory.push("/search/" + this.state.searchQuery)}}>
+                      Search
+                      </Button>
                     </Col>
                   </Row>
                   <Switch>
