@@ -55,7 +55,7 @@ export class FileList extends React.Component<any, FileListState> {
         this.fetchFromSource("http://localhost:16981/fetch/files");
     }
 
-    render() {
+    render(): any {
         if (this.state.isError) {
             // TODO Style better.
             return (
@@ -74,6 +74,13 @@ export class FileList extends React.Component<any, FileListState> {
 export class SearchResults extends FileList {
     componentDidMount() {
         this.fetchFromSource("http://localhost:16981/fetch/search/" + this.props.match.params.query);
+    }
+
+    render() {
+        return [
+            erdemCentered((<h2>Search results for {this.props.match.params.query}</h2>)),
+            super.render()
+        ]
     }
 }
 
