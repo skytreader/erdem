@@ -18,15 +18,17 @@ class Erdem extends React.Component<any, any> {
         this.state = {
         };
 
-        this.handleQueryTyped = this.handleQueryTyped.bind(this);
+        this.handleQuery = this.handleQuery.bind(this);
     }
 
     componentDidMount() {
         document.title = "Erdem";
     }
 
-    handleQueryTyped(event: any) {
-        this.setState({searchQuery: event.target.value});
+    handleQuery(event: any) {
+        if (event.key === "Enter") {
+            erdemHistory.push("/search/" + this.decideSQVal());
+        }
     }
 
     decideSQVal(): string {
@@ -52,7 +54,7 @@ class Erdem extends React.Component<any, any> {
                   <Row>
                     <Col s={0} m={3}></Col>
                     <Col s={6} m={5}>
-                      <input className="searchbox" type="text" placeholder="Query" value={this.state.searchQuery} ref={this.searchQuery}/>
+                      <input className="searchbox" type="text" placeholder="Query" value={this.state.searchQuery} onKeyDown={this.handleQuery} ref={this.searchQuery}/>
                     </Col>
                     <Col s={0} m={1}>
                       <Button className="fullwidth" onClick={() => {erdemHistory.push("/search/" + this.decideSQVal()) }}>
