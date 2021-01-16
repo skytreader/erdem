@@ -52,7 +52,7 @@ class Erdem extends React.Component<any, any> {
                   <Row>
                     <Col s={0} m={3}></Col>
                     <Col s={6} m={5}>
-                      <input className="fullwidth" type="text" placeholder="Query" value={this.state.searchQuery} ref={this.searchQuery}/>
+                      <input className="searchbox" type="text" placeholder="Query" value={this.state.searchQuery} ref={this.searchQuery}/>
                     </Col>
                     <Col s={0} m={1}>
                       <Button className="fullwidth" onClick={() => {erdemHistory.push("/search/" + this.decideSQVal()) }}>
