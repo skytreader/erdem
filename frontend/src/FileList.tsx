@@ -78,7 +78,11 @@ export class SearchResults extends FileList {
 
     render() {
         return [
-            erdemCentered((<h2>Search results for {this.props.match.params.query}</h2>)),
+            (
+                <Row>
+                    {erdemCentered((<h2>Search results for &quot;{this.props.match.params.query}&quot;</h2>))}
+                </Row>
+            ),
             super.render()
         ]
     }

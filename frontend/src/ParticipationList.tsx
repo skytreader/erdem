@@ -1,5 +1,5 @@
 import React from "react";
-import {Row, Col} from "arwes";
+import {Row} from "arwes";
 import {Link} from "react-router-dom";
 import {erdemCentered, makeName, PerformerItem} from "./utils";
 
@@ -45,10 +45,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
             return [
                 (
                     <Row>
-                        <Col s={0} m={3}></Col>
-                        <Col s={12} m={6}>
-                            Participants in <strong>{this.state.participants[0].filename}</strong>
-                        </Col>
+                        {erdemCentered((<h2>Participants in &quot;{this.state.participants[0].filename}&quot;</h2>))}
                     </Row>
                 ),
                 this.state.participants.map((record: PerformerItem) => (
