@@ -69,6 +69,7 @@ class Indexerdem(object):
                            firstname TEXT NOT NULL,
                            lastname TEXT,
                            extraction_rule TEXT NOT NULL,
+                           is_deactivated TINYINT DEFAULT 0 NOT NULL,
                            UNIQUE(firstname, lastname));""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
@@ -143,7 +144,7 @@ class Indexerdem(object):
                     person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
                     if person_id is None:
                         person = (name[0], name[1], name[2].value)
-                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule) VALUES (?, ?, ?)", person)
+                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated) VALUES (?, ?, ?, 0)", person)
                         person_id = cursor.lastrowid
 
                     certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE

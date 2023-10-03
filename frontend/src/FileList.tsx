@@ -52,7 +52,7 @@ export class FileList extends React.Component<any, FileListState> {
     }
 
     componentDidMount() {
-        this.fetchFromSource("http://localhost:16981/fetch/files");
+        this.fetchFromSource("http://localhost:16981/files");
     }
 
     render(): any {
