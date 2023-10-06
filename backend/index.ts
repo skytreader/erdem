@@ -55,7 +55,7 @@ app.get("/fetch/search/:query", async (req, res, next) => {
 app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
     console.log("/fetch/fileparticipants/", req.params.fileid);
     try {
-        const participants: any[] = asAnyArr(await aDbAll(`SELECT persons.id, persons.firstname, persons.lastname, files.filename
+        const participants: any[] = asAnyArr(await aDbAll(`SELECT persons.id, persons.firstname, persons.lastname, files.filename, files.fullpath
             FROM persons, participation, files
             WHERE participation.file_id=${req.params.fileid}
             AND participation.person_id=persons.id
@@ -63,12 +63,14 @@ app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
             AND participation.file_id=files.id;`));
         if (participants.length != 0) {
             const filename = participants[0].filename;
-            return res.json({filename, participants});
+            const fullpath = participants[0].fullpath
+            return res.json({filename, fullpath, participants});
         } else {
-            const filename = await aDbAll(`SELECT filename
+            const details: any = await aDbAll(`SELECT filename, fullpath
             FROM files
             WHERE id=${req.params.fileid}`);
-            return res.json({filename, participants});
+            details["participants"] = []
+            return res.json(details);
         }
     } catch(error) {
         console.error("Caught an exception:", error);

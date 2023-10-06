@@ -6,6 +6,7 @@ import {erdemCentered, makeName, PerformerItem} from "./utils";
 interface ParticipationListState {
     participants: any[];
     filename: string;
+    fullpath: string;
     isError: boolean;
 }
 
@@ -15,7 +16,8 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
         this.state = {
             participants: [],
             isError: false,
-            filename: ""
+            filename: "",
+            fullpath: ""
         };
     }
 
@@ -27,14 +29,13 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                 this.setState({
                     participants: result.participants,
                     isError: false,
-                    filename: result.filename
+                    filename: result.filename,
+                    fullpath: result.fullpath
                 });
             },
             (error) => {
                 this.setState({
-                    participants: [],
                     isError: true,
-                    filename: ""
                 });
                 console.error("Error occurred", error);
             });
@@ -53,6 +54,11 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
                         {erdemCentered((<h2>Participants in &quot;{this.state.participants[0].filename}&quot;</h2>))}
                     </Row>
                 ),
+                (
+                    <Row>
+                        {erdemCentered((<p>Found in {this.state.fullpath}</p>))}
+                    </Row>
+                ),
                 this.state.participants.map((record: PerformerItem) => (
                     <Row key={record.id}>
                         {erdemCentered((<Link to={`/performances/${record.id}`}>{makeName(record)}</Link>))}
@@ -63,6 +69,9 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
             return [
                     <Row>
                         {erdemCentered((<h2>No participants found in &quot;{this.state.filename}&quot;</h2>))}
+                    </Row>,
+                    <Row>
+                        {erdemCentered((<p>Found in {this.state.fullpath}</p>))}
                     </Row>
             ];
         }
