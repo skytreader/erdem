@@ -125,18 +125,41 @@ class Indexerdem(object):
                 forward = i + 1
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
-                        names.append((word, hayparse[forward], NameDecisionRule.ALMOST_CERTAIN))
+                        names.append(
+                            (
+                                word.capitalize(),
+                                hayparse[forward].capitalize(),
+                                NameDecisionRule.ALMOST_CERTAIN
+                            )
+                        )
                         i = forward + 1
                         continue
                     else:
-                        names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
+                        names.append(
+                            (
+                                word.capitalize(),
+                                None,
+                                NameDecisionRule.TRUNCATED_FIRSTNAME
+                            )
+                        )
                 else:
-                    names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
+                    names.append(
+                        (
+                            word.capitalize(),
+                            None,
+                            NameDecisionRule.TRUNCATED_FIRSTNAME
+                        )
+                    )
             elif word in self.last_names:
                 backward = i - 1
                 if backward >= 0:
-                   names.append((hayparse[backward], word, NameDecisionRule.LASTNAME_BACKWARD))
-
+                   names.append(
+                        (
+                            hayparse[backward].capitalize(),
+                            word.capitalize(),
+                            NameDecisionRule.LASTNAME_BACKWARD
+                        )
+                    )
 
             i += 1
         
