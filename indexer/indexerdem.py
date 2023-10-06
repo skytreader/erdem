@@ -20,9 +20,35 @@ import re
 import sqlite3
 
 NONWORD: re.Pattern = re.compile("\W+")
+
+# From https://stackoverflow.com/a/56944256/777225
+class ColoredLogFormatter(logging.Formatter):
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())
+_loghandler = logging.StreamHandler()
+_loghandler.setFormatter(ColoredLogFormatter())
+logger.addHandler(_loghandler)
 
 class NameDecisionRule(Enum):
     ALMOST_CERTAIN = "almost-certain"
@@ -134,7 +160,10 @@ class Indexerdem(object):
         try:
             cleaned = self.__normalize_filename(filename)
             cursor = self.conn.cursor()
-            cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
+            try:
+                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
+            except sqlite3.IntegrityError:
+                logger.warn("File previously indexed: " + str((filename, fullpath)))
             file_id = cursor.lastrowid
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
@@ -148,13 +177,15 @@ class Indexerdem(object):
                         person_id = cursor.lastrowid
 
                     certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE
-                    cursor.execute(
-                        "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
-                        (person_id, file_id, certainty)
-                    )
+                    try:
+                        cursor.execute(
+                            "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
+                            (person_id, file_id, certainty)
+                        )
+                    except sqlite3.IntegrityError:
+                        logger.warn("Name repeated in filename: " + str(name))
                 else:
                     logger.error("Found an odd name: %s" % str(name))
-
         except:
             logger.exception("Ran into some problems...")
         finally:
@@ -185,7 +216,12 @@ if __name__ == "__main__":
         "--locales", "-l", type=str, default="en,en_GB,en_US,en_NZ",
         help="Comma-separated list of locales that we will use to detect names."
     )
+    parser.add_argument(
+        "--output", "-o", type=str, default="cache.db",
+        # TODO Ensure overwrite guarantee is true!
+        help="filepath to output file. An existing file will not be overwritten."
+    )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem("cache.db", args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
+    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
     indexer.init()
     indexer.readdir(args["filepath"])
