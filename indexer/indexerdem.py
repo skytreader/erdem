@@ -29,7 +29,7 @@ class ColoredLogFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+    format = "%(asctime)s - (%(filename)s:%(lineno)d)- %(name)s.%(levelname)s - %(message)s"
 
     FORMATS = {
         logging.DEBUG: grey + format + reset,
@@ -89,7 +89,9 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC,
                            filename TEXT UNIQUE NOT NULL,
-                           fullpath TEXT NOT NULL);""")
+                           fullpath TEXT NOT NULL,
+                           rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
+                           review TEXT);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
