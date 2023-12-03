@@ -56,11 +56,13 @@ app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
     console.log("/fetch/fileparticipants/", req.params.fileid);
     try {
         const participants: any[] = asAnyArr(await aDbAll(`SELECT persons.id, persons.firstname, persons.lastname, files.filename, files.fullpath
-            FROM persons, participation, files
-            WHERE participation.file_id=${req.params.fileid}
-            AND participation.person_id=persons.id
-            AND persons.is_deactivated=0
-            AND participation.file_id=files.id;`));
+            FROM files
+            LEFT JOIN participation
+                ON participation.file_id=files.id
+            LEFT JOIN persons
+                ON persons.id=participation.person_id
+                AND persons.is_deactivated=0
+            WHERE files.id=${req.params.fileid};`));
         if (participants.length != 0) {
             const filename = participants[0].filename;
             const fullpath = participants[0].fullpath
