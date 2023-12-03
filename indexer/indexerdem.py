@@ -19,7 +19,7 @@ import os
 import re
 import sqlite3
 
-NONWORD: re.Pattern = re.compile("\W+")
+NONWORD: re.Pattern = re.compile("[\W\_]+")
 
 # From https://stackoverflow.com/a/56944256/777225
 class ColoredLogFormatter(logging.Formatter):
@@ -184,12 +184,14 @@ class Indexerdem(object):
 
         try:
             cleaned = self.__normalize_filename(filename)
+            file_id = -1
             cursor = self.conn.cursor()
             try:
                 cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
+                file_id = cursor.lastrowid
             except sqlite3.IntegrityError:
-                logger.warn("File previously indexed: " + str((filename, fullpath)))
-            file_id = cursor.lastrowid
+                file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, fullpath)).fetchone()[0]
+                logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
 
@@ -208,7 +210,7 @@ class Indexerdem(object):
                             (person_id, file_id, certainty)
                         )
                     except sqlite3.IntegrityError:
-                        logger.warn("Name repeated in filename: " + str(name))
+                        logger.warn("Name previously indexed for file: " + str(name))
                 else:
                     logger.error("Found an odd name: %s" % str(name))
         except:
