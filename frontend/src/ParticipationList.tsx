@@ -4,7 +4,7 @@ import {Link} from "react-router-dom";
 import {erdemCentered, makeName, PerformerItem} from "./utils";
 
 interface ParticipationListState {
-    participants: any[];
+    participants?: any[];
     filename: string;
     fullpath: string;
     isError: boolean;
@@ -47,7 +47,7 @@ class ParticipationList extends React.Component<any, ParticipationListState> {
             return (
                 <div>Error connecting to server.</div>
             )
-        } else if (this.state.participants.length > 0) {
+        } else if (this.state.participants && this.state.participants.length > 0) {
             return [
                 (
                     <Row>
