@@ -10,6 +10,7 @@ const asAnyArr = (x: any) => (x as any[]);
 
 const app: express.Application = express();
 app.use(cors());
+app.use(express.json());
 app.options("*", cors());
 
 app.get("/", (req, res) => {
@@ -52,10 +53,10 @@ app.get("/fetch/search/:query", async (req, res, next) => {
     }
 });
 
-app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
-    console.log("/fetch/fileparticipants/", req.params.fileid);
+app.get("/file/:fileid", async (req, res, next) => {
+    console.log("/file/", req.params.fileid);
     try {
-        const participants: any[] = asAnyArr(await aDbAll(`SELECT persons.id, persons.firstname, persons.lastname, files.filename, files.fullpath
+        const participants: any[] = asAnyArr(await aDbAll(`SELECT persons.id, persons.firstname, persons.lastname, files.filename, files.fullpath, files.review
             FROM files
             LEFT JOIN participation
                 ON participation.file_id=files.id
@@ -65,15 +66,29 @@ app.get("/fetch/fileparticipants/:fileid", async (req, res, next) => {
             WHERE files.id=${req.params.fileid};`));
         if (participants.length != 0) {
             const filename = participants[0].filename;
-            const fullpath = participants[0].fullpath
-            return res.json({filename, fullpath, participants});
+            const fullpath = participants[0].fullpath;
+            const review = participants[0].review;
+            return res.json({filename, fullpath, participants, review});
         } else {
-            const details: any = await aDbAll(`SELECT filename, fullpath
+            const details: any = await aDbAll(`SELECT filename, fullpath, review
             FROM files
             WHERE id=${req.params.fileid}`);
             details["participants"] = []
             return res.json(details);
         }
+    } catch(error) {
+        console.error("Caught an exception:", error);
+        next(error);
+    }
+});
+
+app.post("/file/:fileid", async (req, res, next) => {
+    console.log("POST /file/", req.params.fileid, req.headers, req.body);
+    try {
+        await aDbAll(`UPDATE files
+        SET review="${req.body.review}"
+        WHERE id=${req.params.fileid}`);
+        return res.send("OK");
     } catch(error) {
         console.error("Caught an exception:", error);
         next(error);
