@@ -182,15 +182,22 @@ class Indexerdem(object):
         def decide_certainty(nametpl: NameTuple) -> bool:
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
+        def make_canonical(absolute_path: str) -> str:
+            if absolute_path[-1] != os.path.sep:
+                return f"{absolute_path}{os.path.sep}"
+
+            return absolute_path
+
         try:
             cleaned = self.__normalize_filename(filename)
             file_id = -1
             cursor = self.conn.cursor()
+            canon_fullpath = make_canonical(fullpath)
             try:
-                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
+                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, canon_fullpath))
                 file_id = cursor.lastrowid
             except sqlite3.IntegrityError:
-                file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, fullpath)).fetchone()[0]
+                file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, canon_fullpath)).fetchone()[0]
                 logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
@@ -246,7 +253,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", "-o", type=str, default="cache.db",
         # TODO Ensure overwrite guarantee is true!
-        help="filepath to output file. An existing file will not be overwritten."
+        help="filepath to output file. An existing file will be appended to."
     )
     args = vars(parser.parse_args())
     indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
