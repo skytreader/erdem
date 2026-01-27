@@ -1,7 +1,7 @@
 import React from "react";
-import {Row} from "arwes";
+import {Button, Col, Row} from "arwes";
 import {Link} from "react-router-dom";
-import {erdemCentered, makeName, PerformerItem} from "./utils";
+import {makeName, PerformerItem} from "./utils";
 
 interface PerformerListState {
     performers: PerformerItem[];
@@ -19,7 +19,7 @@ class PerformerList extends React.Component<any, PerformerListState> {
     }
 
     componentDidMount() {
-        fetch("http://localhost:16981/fetch/persons")
+        fetch("http://localhost:16981/persons/active")
             .then(res => res.json())
             .then((result) => {
                 this.setState({
@@ -47,6 +47,22 @@ class PerformerList extends React.Component<any, PerformerListState> {
             });
     }
 
+    deactivatePerson(personId: number) {
+        fetch(`http://localhost:16981/person/${personId}/is_deactivated/1`,
+            {method: "PATCH"})
+        .then((event) => {
+            console.log("removed person", personId);
+            this.setState({
+                performers: this.state.performers.filter((p) => p.id !== personId)
+            });
+            // TODO Find out how to make render work.
+            // ReactDOM.render(
+            //     <Arwes><Appear animate>Removal successful</Appear></Arwes>,
+            //     document.getElementById("root")
+            // );
+        });
+    }
+
     render() {
         if (this.state.isError) {
             // TODO Style better.
@@ -56,7 +72,12 @@ class PerformerList extends React.Component<any, PerformerListState> {
         } else {
             return this.state.performers.map((performer) => (
                 <Row key={performer.id}>
-                    {erdemCentered((<Link to={`/performances/${performer.id}`}>{makeName(performer)}</Link>))}
+                    <Col s={5} offset={["s3"]}>
+                        <Link to={`/performances/${performer.id}`}>{makeName(performer)}</Link>
+                    </Col>
+                    <Col s={1}>
+                        <Button className="fullwidth" onClick={() => this.deactivatePerson(performer.id)}>Delete</Button>
+                    </Col>
                 </Row>
             ));
         }

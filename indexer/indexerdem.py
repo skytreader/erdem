@@ -19,10 +19,36 @@ import os
 import re
 import sqlite3
 
-NONWORD: re.Pattern = re.compile("\W+")
+NONWORD: re.Pattern = re.compile("[\W\_]+")
+
+# From https://stackoverflow.com/a/56944256/777225
+class ColoredLogFormatter(logging.Formatter):
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - (%(filename)s:%(lineno)d)- %(name)s.%(levelname)s - %(message)s"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.INFO)
-logger.addHandler(logging.StreamHandler())
+_loghandler = logging.StreamHandler()
+_loghandler.setFormatter(ColoredLogFormatter())
+logger.addHandler(_loghandler)
 
 class NameDecisionRule(Enum):
     ALMOST_CERTAIN = "almost-certain"
@@ -63,12 +89,15 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC,
                            filename TEXT UNIQUE NOT NULL,
-                           fullpath TEXT NOT NULL);""")
+                           fullpath TEXT NOT NULL,
+                           rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
+                           review TEXT);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
                            lastname TEXT,
                            extraction_rule TEXT NOT NULL,
+                           is_deactivated TINYINT DEFAULT 0 NOT NULL,
                            UNIQUE(firstname, lastname));""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
                           (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
@@ -98,18 +127,41 @@ class Indexerdem(object):
                 forward = i + 1
                 if forward < limit:
                     if hayparse[forward] in self.last_names:
-                        names.append((word, hayparse[forward], NameDecisionRule.ALMOST_CERTAIN))
+                        names.append(
+                            (
+                                word.capitalize(),
+                                hayparse[forward].capitalize(),
+                                NameDecisionRule.ALMOST_CERTAIN
+                            )
+                        )
                         i = forward + 1
                         continue
                     else:
-                        names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
+                        names.append(
+                            (
+                                word.capitalize(),
+                                None,
+                                NameDecisionRule.TRUNCATED_FIRSTNAME
+                            )
+                        )
                 else:
-                    names.append((word, None, NameDecisionRule.TRUNCATED_FIRSTNAME))
+                    names.append(
+                        (
+                            word.capitalize(),
+                            None,
+                            NameDecisionRule.TRUNCATED_FIRSTNAME
+                        )
+                    )
             elif word in self.last_names:
                 backward = i - 1
                 if backward >= 0:
-                   names.append((hayparse[backward], word, NameDecisionRule.LASTNAME_BACKWARD))
-
+                   names.append(
+                        (
+                            hayparse[backward].capitalize(),
+                            word.capitalize(),
+                            NameDecisionRule.LASTNAME_BACKWARD
+                        )
+                    )
 
             i += 1
         
@@ -130,11 +182,23 @@ class Indexerdem(object):
         def decide_certainty(nametpl: NameTuple) -> bool:
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
+        def make_canonical(absolute_path: str) -> str:
+            if absolute_path[-1] != os.path.sep:
+                return f"{absolute_path}{os.path.sep}"
+
+            return absolute_path
+
         try:
             cleaned = self.__normalize_filename(filename)
+            file_id = -1
             cursor = self.conn.cursor()
-            cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, fullpath))
-            file_id = cursor.lastrowid
+            canon_fullpath = make_canonical(fullpath)
+            try:
+                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, canon_fullpath))
+                file_id = cursor.lastrowid
+            except sqlite3.IntegrityError:
+                file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, canon_fullpath)).fetchone()[0]
+                logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
 
@@ -143,17 +207,19 @@ class Indexerdem(object):
                     person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
                     if person_id is None:
                         person = (name[0], name[1], name[2].value)
-                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule) VALUES (?, ?, ?)", person)
+                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated) VALUES (?, ?, ?, 0)", person)
                         person_id = cursor.lastrowid
 
                     certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE
-                    cursor.execute(
-                        "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
-                        (person_id, file_id, certainty)
-                    )
+                    try:
+                        cursor.execute(
+                            "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
+                            (person_id, file_id, certainty)
+                        )
+                    except sqlite3.IntegrityError:
+                        logger.warn("Name previously indexed for file: " + str(name))
                 else:
                     logger.error("Found an odd name: %s" % str(name))
-
         except:
             logger.exception("Ran into some problems...")
         finally:
@@ -184,7 +250,12 @@ if __name__ == "__main__":
         "--locales", "-l", type=str, default="en,en_GB,en_US,en_NZ",
         help="Comma-separated list of locales that we will use to detect names."
     )
+    parser.add_argument(
+        "--output", "-o", type=str, default="cache.db",
+        # TODO Ensure overwrite guarantee is true!
+        help="filepath to output file. An existing file will be appended to."
+    )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem("cache.db", args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
+    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
     indexer.init()
     indexer.readdir(args["filepath"])
