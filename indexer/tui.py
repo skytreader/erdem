@@ -1,5 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
+from textual.screen import Screen
 from textual.widgets import Button, Header, Input, Label, ListView, ListItem, TabbedContent, TabPane
 
 class ErdemHeader(Header):
@@ -16,7 +17,7 @@ class ErdemSearch(HorizontalGroup):
         search_btn = Button("Search", id="search")
         yield search_btn
 
-class ErdemHomeApp(App):
+class ErdemHomeScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -42,6 +43,15 @@ class ErdemHomeApp(App):
         self.title = "Erdem"
         self.sub_title = "Media Notes"
 
+class ErdemApp(App):
+
+    SCREENS = {
+        "home": ErdemHomeScreen
+    }
+
+    def on_mount(self) -> None:
+        self.push_screen("home")
+
 if __name__ == "__main__":
-    app = ErdemHomeApp()
+    app = ErdemApp()
     app.run()
