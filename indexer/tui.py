@@ -1,12 +1,9 @@
+from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
 from textual.screen import Screen
-from textual.widgets import Button, Header, Input, Label, ListView, ListItem, TabbedContent, TabPane
-
-class ErdemHeader(Header):
-
-    def compose(self) -> ComposeResult:
-        yield Header()
+from textual.widgets import Button, Header, Input, Label, ListView, ListItem, OptionList, Static, TabbedContent, TabPane
+from textual.widgets.option_list import Option
 
 class ErdemSearch(HorizontalGroup):
 
@@ -18,6 +15,8 @@ class ErdemSearch(HorizontalGroup):
         yield search_btn
 
 class ErdemHomeScreen(Screen):
+    TITLE = "Erdem"
+    SUB_TITLE = "Media Notes"
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -32,16 +31,30 @@ class ErdemHomeScreen(Screen):
                     ListItem(Label("No Time to Die"))
                 )
             with TabPane("Performers", id="performers-list"):
-                yield ListView(
-                    ListItem(Label("Craig, Daniel")),
-                    ListItem(Label("de Aramas, Ana")),
-                    ListItem(Label("Green, Eva")),
-                    ListItem(Label("Mikkelsen, Mads"))
+                yield OptionList(
+                    Option("Craig, Daniel", id="James Bond"),
+                    Option("de Armas, Ana", id="Paloma"),
+                    Option("Green, Eva", id="Vesper Lynd"),
+                    Option("Mikkelsen, Mads", id="Le Chiffre")
                 )
+
+    @on(OptionList.OptionSelected)
+    async def option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.app.push_screen(PerformerView(event.option.id))
+
+class PerformerView(Screen):
+
+    def __init__(self, performer_name: str):
+        super().__init__()
+        self.performer_name = performer_name
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static(f"[h1]{self.performer_name}[/h1]")
 
     def on_mount(self) -> None:
         self.title = "Erdem"
-        self.sub_title = "Media Notes"
+        self.sub_title = f"Media Notes - {self.performer_name}"
 
 class ErdemApp(App):
 
