@@ -2,7 +2,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
 from textual.screen import Screen
-from textual.widgets import Button, Header, Input, Label, ListView, ListItem, OptionList, Static, TabbedContent, TabPane
+from textual.widgets import Button, Header, Input, Label, OptionList, Static, TabbedContent, TabPane
 from textual.widgets.option_list import Option
 
 class ErdemSearch(HorizontalGroup):
@@ -21,26 +21,46 @@ class ErdemHomeScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield ErdemSearch()
-        with TabbedContent(initial="media-list"):
-            with TabPane("Media", id="media-list"):
-                yield ListView(
-                    ListItem(Label("Casino Royale")),
-                    ListItem(Label("Quantum of Solace")),
-                    ListItem(Label("Skyfall")),
-                    ListItem(Label("Spectre")),
-                    ListItem(Label("No Time to Die"))
+        with TabbedContent(initial="media-tab"):
+            with TabPane("Media", id="media-tab"):
+                yield OptionList(
+                    Option("Casino Royale"),
+                    Option("Quantum of Solace"),
+                    Option("Skyfall"),
+                    Option("Spectre"),
+                    Option("No Time to Die"),
+                    id="media-list"
                 )
-            with TabPane("Performers", id="performers-list"):
+            with TabPane("Performers", id="performers-tab"):
                 yield OptionList(
                     Option("Craig, Daniel", id="James Bond"),
                     Option("de Armas, Ana", id="Paloma"),
                     Option("Green, Eva", id="Vesper Lynd"),
-                    Option("Mikkelsen, Mads", id="Le Chiffre")
+                    Option("Mikkelsen, Mads", id="Le Chiffre"),
+                    id="performers-list"
                 )
 
-    @on(OptionList.OptionSelected)
-    async def option_selected(self, event: OptionList.OptionSelected) -> None:
+    @on(OptionList.OptionSelected, "#performers-list")
+    async def performer_selected(self, event: OptionList.OptionSelected) -> None:
         self.app.push_screen(PerformerView(event.option.id))
+
+    @on(OptionList.OptionSelected, "#media-list")
+    async def media_selected(self, event: OptionList.OptionSelected) -> None:
+        pass
+
+class MediaView(Screen):
+
+    def __init__(self, title: str):
+        super().__init__()
+        self.title = title
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static(self.title)
+
+    def on_mount(self) -> None:
+        self.title = "Erdem"
+        self.sub_title = f"Media Notes - {self.title}"
 
 class PerformerView(Screen):
 
@@ -54,7 +74,7 @@ class PerformerView(Screen):
 
     def on_mount(self) -> None:
         self.title = "Erdem"
-        self.sub_title = f"Media Notes - {self.performer_name}"
+        self.sub_title = f"Performer Notes - {self.performer_name}"
 
 class ErdemApp(App):
 
