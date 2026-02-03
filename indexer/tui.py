@@ -2,7 +2,10 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
 from textual.screen import Screen
-from textual.widgets import Button, Header, Input, Label, OptionList, Static, TabbedContent, TabPane
+from textual.widgets import (
+    Button, Footer, Header, Input, Label, OptionList, Static, TabbedContent,
+    TabPane
+)
 from textual.widgets.option_list import Option
 
 class ErdemSearch(HorizontalGroup):
@@ -39,6 +42,7 @@ class ErdemHomeScreen(Screen):
                     Option("Mikkelsen, Mads", id="Le Chiffre"),
                     id="performers-list"
                 )
+        yield Footer()
 
     @on(OptionList.OptionSelected, "#performers-list")
     async def performer_selected(self, event: OptionList.OptionSelected) -> None:
@@ -57,6 +61,7 @@ class MediaView(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(self.title)
+        yield Footer()
 
     def on_mount(self) -> None:
         self.title = "Erdem"
@@ -71,6 +76,7 @@ class PerformerView(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(f"[h1]{self.performer_name}[/h1]")
+        yield Footer()
 
     def on_mount(self) -> None:
         self.title = "Erdem"
