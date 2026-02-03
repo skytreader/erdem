@@ -10,10 +10,12 @@ Assumptions:
 """
 from argparse import ArgumentParser
 from collections import OrderedDict
+from dataclasses import dataclass
 from enum import Enum
 from importlib import import_module
 from typing import Iterable, Optional, List, Set, Tuple, Union
 
+import locale as pylocale
 import logging
 import os
 import re
@@ -58,16 +60,39 @@ class NameDecisionRule(Enum):
 
 NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 
+@dataclass
+class FileIndexRecord:
+    id: int
+    filename: str
+    fullpath: str
+    rating: int
+    review: str
+
+@dataclass
+class PersonIndexRecord:
+    id: int
+    firstname: str
+    lastname: str
+    extraction_rule: NameDecisionRule
+
+@dataclass
+class PerformanceIndexRecord:
+    file: FileIndexRecord
+    performer: PersonIndexRecord
+
 class Indexerdem(object):
 
     SQLITE_TRUE = 1
     SQLITE_FALSE = 0
 
-    def __init__(self, index_filename: str, locales: Iterable[str], extensions: Iterable[str]):
+    DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
+
+    def __init__(self, index_filename: str, locales: Optional[Iterable[str]], extensions: Optional[Iterable[str]]):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
-        self.extensions: Set[str] = set(extensions)
+        self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
+        locales = tuple([locale.getlocale()[0]]) if locales is None else locales
         for loc in locales:
             person_providers_module = import_module("faker.providers.person.%s" % loc)
             self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female) # type: ignore
@@ -240,6 +265,15 @@ class Indexerdem(object):
         finally:
             self.conn.close()
 
+    def fetch_files(self, limit=None):
+        cursor = self.conn.cursor()
+        query = (
+            f"SELECT * FROM files LIMIT={limit}"
+            if limit is not None else
+            "SELECT * FROM files"
+        )
+        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
     parser.add_argument(
@@ -256,6 +290,6 @@ if __name__ == "__main__":
         help="filepath to output file. An existing file will be appended to."
     )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), ("mp4", "avi", "flv", "mkv"))
+    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), Indexerdem.DEFAULT_EXTENSIONS)
     indexer.init()
     indexer.readdir(args["filepath"])
