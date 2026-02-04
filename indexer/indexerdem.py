@@ -31,14 +31,14 @@ class ColoredLogFormatter(logging.Formatter):
     red = "\x1b[31;20m"
     bold_red = "\x1b[31;1m"
     reset = "\x1b[0m"
-    format = "%(asctime)s - (%(filename)s:%(lineno)d)- %(name)s.%(levelname)s - %(message)s"
+    format_ = "%(asctime)s - (%(filename)s:%(lineno)d)- %(name)s.%(levelname)s - %(message)s"
 
     FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: grey + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
+        logging.DEBUG: grey + format_ + reset,
+        logging.INFO: grey + format_ + reset,
+        logging.WARNING: yellow + format_ + reset,
+        logging.ERROR: red + format_ + reset,
+        logging.CRITICAL: bold_red + format_ + reset
     }
 
     def format(self, record):
@@ -86,13 +86,19 @@ class Indexerdem(object):
     SQLITE_FALSE = 0
 
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
+    DEFAULT_LOCALES = ("en", "en_GB", "en_US", "en_NZ")
 
     def __init__(self, index_filename: str, locales: Optional[Iterable[str]] = None, extensions: Optional[Iterable[str]] = None):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
         self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
-        locales = tuple([pylocale.getlocale()[0]]) if locales is None else locales
+        if locales is None:
+            runtime_locale = pylocale.getlocale()
+            if len(runtime_locale) >= 1 and runtime_locale[0] is not None:
+                locales = (runtime_locale[0],)
+            else:
+                locales = Indexerdem.DEFAULT_LOCALES
         for loc in locales:
             person_providers_module = import_module("faker.providers.person.%s" % loc)
             self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female) # type: ignore
@@ -215,7 +221,7 @@ class Indexerdem(object):
 
         try:
             cleaned = self.__normalize_filename(filename)
-            file_id = -1
+            file_id: Union[int, None] = -1
             cursor = self.conn.cursor()
             canon_fullpath = make_canonical(fullpath)
             try:
@@ -273,6 +279,9 @@ class Indexerdem(object):
             "SELECT * FROM files"
         )
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+    
+    def fetch_persons(self, active_only=True):
+        cursor = self.conn.cursor()
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
