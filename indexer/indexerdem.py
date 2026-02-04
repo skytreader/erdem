@@ -87,12 +87,12 @@ class Indexerdem(object):
 
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
 
-    def __init__(self, index_filename: str, locales: Optional[Iterable[str]], extensions: Optional[Iterable[str]]):
+    def __init__(self, index_filename: str, locales: Optional[Iterable[str]] = None, extensions: Optional[Iterable[str]] = None):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
         self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
-        locales = tuple([locale.getlocale()[0]]) if locales is None else locales
+        locales = tuple([pylocale.getlocale()[0]]) if locales is None else locales
         for loc in locales:
             person_providers_module = import_module("faker.providers.person.%s" % loc)
             self.first_names_female |= self.__extract_names(person_providers_module.Provider.first_names_female) # type: ignore

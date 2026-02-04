@@ -8,6 +8,8 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
+from .indexerdem import Indexerdem
+
 class ErdemSearch(HorizontalGroup):
 
     def compose(self) -> ComposeResult:
@@ -21,17 +23,17 @@ class ErdemHomeScreen(Screen):
     TITLE = "Erdem"
     SUB_TITLE = "Media Notes"
 
+    def __init__(self):
+        super().__init__()
+        self.titles = self.app.index.fetch_files()
+
     def compose(self) -> ComposeResult:
         yield Header()
         yield ErdemSearch()
         with TabbedContent(initial="media-tab"):
             with TabPane("Media", id="media-tab"):
                 yield OptionList(
-                    Option("Casino Royale"),
-                    Option("Quantum of Solace"),
-                    Option("Skyfall"),
-                    Option("Spectre"),
-                    Option("No Time to Die"),
+                    *tuple(Option(title.filename, id=title.id) for title in self.titles),
                     id="media-list"
                 )
             with TabPane("Performers", id="performers-tab"):
@@ -87,6 +89,10 @@ class ErdemApp(App):
     SCREENS = {
         "home": ErdemHomeScreen
     }
+
+    def __init__(self):
+        super().__init__()
+        self.index = Indexerdem("cache.db")
 
     def on_mount(self) -> None:
         self.push_screen("home")
