@@ -11,7 +11,7 @@ Assumptions:
 from argparse import ArgumentParser
 from collections import OrderedDict
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from importlib import import_module
 from typing import Iterable, Optional, List, Set, Tuple, Union
 
@@ -52,7 +52,7 @@ _loghandler = logging.StreamHandler()
 _loghandler.setFormatter(ColoredLogFormatter())
 logger.addHandler(_loghandler)
 
-class NameDecisionRule(Enum):
+class NameDecisionRule(StrEnum):
     ALMOST_CERTAIN = "almost-certain"
     TRUNCATED_FIRSTNAME = "truncated-firstname"
     LASTNAME_BACKWARD = "lastname-backward"
@@ -74,6 +74,10 @@ class PersonIndexRecord:
     firstname: str
     lastname: str
     extraction_rule: NameDecisionRule
+
+    @staticmethod
+    def from_sqlite_record(record: tuple[int, str, str, str]) -> PersonIndexRecord:
+        return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]))
 
 @dataclass
 class PerformanceIndexRecord:
@@ -271,6 +275,9 @@ class Indexerdem(object):
         finally:
             self.conn.close()
 
+    def __sqliteify(self, b: bool) -> int:
+        return Indexerdem.SQLITE_TRUE if b else Indexerdem.SQLITE_FALSE
+
     def fetch_files(self, limit=None):
         cursor = self.conn.cursor()
         query = (
@@ -280,8 +287,14 @@ class Indexerdem(object):
         )
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
     
-    def fetch_persons(self, active_only=True):
+    def fetch_persons(self, activity_status: Optional[bool] = None):
         cursor = self.conn.cursor()
+        query = (
+            f"SELECT * FROM persons WHERE is_deactivated={self.__sqliteify(activity_status)}"
+            if activity_status is not None else
+            "SELECT * FROM persons"
+        )
+        return tuple(PersonIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
