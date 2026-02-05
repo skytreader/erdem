@@ -26,6 +26,7 @@ class ErdemHomeScreen(Screen):
     def __init__(self):
         super().__init__()
         self.titles = self.app.index.fetch_files()
+        self.performers = self.app.index.fetch_persons(False)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -38,10 +39,7 @@ class ErdemHomeScreen(Screen):
                 )
             with TabPane("Performers", id="performers-tab"):
                 yield OptionList(
-                    Option("Craig, Daniel", id="James Bond"),
-                    Option("de Armas, Ana", id="Paloma"),
-                    Option("Green, Eva", id="Vesper Lynd"),
-                    Option("Mikkelsen, Mads", id="Le Chiffre"),
+                    *tuple(Option(str(p), id=p.id) for p in self.performers),
                     id="performers-list"
                 )
         yield Footer()

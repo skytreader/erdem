@@ -76,8 +76,15 @@ class PersonIndexRecord:
     extraction_rule: NameDecisionRule
 
     @staticmethod
-    def from_sqlite_record(record: tuple[int, str, str, str]) -> PersonIndexRecord:
+    def from_sqlite_record(record: tuple[int, str, str, str]) -> "PersonIndexRecord":
         return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]))
+
+    def __str__(self):
+        return (
+            f"{self.lastname}, {self.firstname}"
+            if self.lastname is not None else
+            self.firstname
+        )
 
 @dataclass
 class PerformanceIndexRecord:
@@ -278,7 +285,7 @@ class Indexerdem(object):
     def __sqliteify(self, b: bool) -> int:
         return Indexerdem.SQLITE_TRUE if b else Indexerdem.SQLITE_FALSE
 
-    def fetch_files(self, limit=None):
+    def fetch_files(self, limit=None) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
         query = (
             f"SELECT * FROM files LIMIT={limit}"
@@ -287,7 +294,13 @@ class Indexerdem(object):
         )
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
     
-    def fetch_persons(self, activity_status: Optional[bool] = None):
+    def get_file_record_from_id(self, id: int) -> Optional[FileIndexRecord]:
+        cursor = self.conn.cursor()
+        query = f"SELECT * FROM files WHERE id={id} LIMIT 1"
+        result = cursor.execute(query).fetchone()
+        return FileIndexRecord(*result) if result is not None else None
+    
+    def fetch_persons(self, activity_status: Optional[bool] = None) -> tuple[PersonIndexRecord, ...]:
         cursor = self.conn.cursor()
         query = (
             f"SELECT * FROM persons WHERE is_deactivated={self.__sqliteify(activity_status)}"
