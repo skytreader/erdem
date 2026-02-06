@@ -46,11 +46,13 @@ class ErdemHomeScreen(Screen):
 
     @on(OptionList.OptionSelected, "#performers-list")
     async def performer_selected(self, event: OptionList.OptionSelected) -> None:
-        self.app.push_screen(PerformerView(event.option.id))
+        if event.option.id is not None:
+            self.app.push_screen(PerformerView(event.option.id))
 
     @on(OptionList.OptionSelected, "#media-list")
     async def media_selected(self, event: OptionList.OptionSelected) -> None:
-        self.app.push_screen(MediaView(event.option.id))
+        if event.option.id is not None:
+            self.app.push_screen(MediaView(int(event.option.id)))
 
 class MediaView(Screen):
 
@@ -60,7 +62,7 @@ class MediaView(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(self.record.filename)
+        yield Static(self.record.filename if self.record is not None else "Unknown")
         yield Footer()
 
     def on_mount(self) -> None:

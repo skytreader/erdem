@@ -14,7 +14,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib import import_module
-from typing import Iterable, Optional, List, Set, Tuple, Union
+from typing import Any, Iterable, Optional, List, Set, Tuple, Union
 
 import locale as pylocale
 import logging
@@ -66,7 +66,13 @@ class SQLiteDataClass(ABC):
 
     @staticmethod
     @abstractmethod
-    def fetch(cursor, id) -> Optional["SQLiteDataClass"]:
+    def fetch(cursor, id: Any) -> Optional["SQLiteDataClass"]:
+        """
+        Fetch one record from the represented table. `id` should be enough to
+        fetch a unique record. Most of the time, this can be an integer but, for
+        composite keys, it can also be a tuple or an object from which the
+        defining attributes can be derived.
+        """
         pass
 
 @dataclass
