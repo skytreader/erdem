@@ -8,6 +8,7 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
+from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -61,12 +62,26 @@ class NameDecisionRule(StrEnum):
 NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 
 @dataclass
-class FileIndexRecord:
+class SQLiteDataClass(ABC):
+
+    @staticmethod
+    @abstractmethod
+    def fetch(cursor, id) -> Optional["SQLiteDataClass"]:
+        pass
+
+@dataclass
+class FileIndexRecord(SQLiteDataClass):
     id: int
     filename: str
     fullpath: str
     rating: int
     review: str
+
+    @staticmethod
+    def fetch(cursor, id) -> Optional["FileIndexRecord"]:
+        query = f"SELECT * FROM files WHERE id={id} LIMIT 1"
+        result = cursor.execute(query).fetchone()
+        return FileIndexRecord(*result) if result is not None else None
 
 @dataclass
 class PersonIndexRecord:

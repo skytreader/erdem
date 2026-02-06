@@ -8,7 +8,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
-from .indexerdem import Indexerdem
+from .indexerdem import FileIndexRecord, Indexerdem
 
 class ErdemSearch(HorizontalGroup):
 
@@ -50,17 +50,17 @@ class ErdemHomeScreen(Screen):
 
     @on(OptionList.OptionSelected, "#media-list")
     async def media_selected(self, event: OptionList.OptionSelected) -> None:
-        pass
+        self.app.push_screen(MediaView(event.option.id))
 
 class MediaView(Screen):
 
-    def __init__(self, title: str):
+    def __init__(self, id: int):
         super().__init__()
-        self.title = title
+        self.record = FileIndexRecord.fetch(self.app.index.conn.cursor(), id)
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(self.title)
+        yield Static(self.record.filename)
         yield Footer()
 
     def on_mount(self) -> None:
