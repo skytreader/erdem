@@ -7,9 +7,9 @@ from textual.widgets import (
     TabPane
 )
 from textual.widgets.option_list import Option
-from typing import cast
+from typing import cast, Optional
 
-from .indexerdem import FileIndexRecord, Indexerdem
+from .indexerdem import FileIndexRecord, Indexerdem, PerformanceIndexRecord, PersonIndexRecord
 
 class ErdemSearch(HorizontalGroup):
 
@@ -66,10 +66,21 @@ class MediaView(ErdemScreen):
     def __init__(self, id: int):
         super().__init__()
         self.record = FileIndexRecord.fetch(self.erdem_app.index.conn.cursor(), id)
+        self.is_error_state = self.record is None
+        if not self.is_error_state:
+            performers_result = PerformanceIndexRecord.fetch(
+                self.erdem_app.index.conn.cursor(),
+                self.record # type: ignore
+            )
+            self.performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(self.record.filename if self.record is not None else "Unknown")
+        yield OptionList(
+            *tuple(Option(str(performer)) for performer in self.performers),
+            id="performers-list"
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -104,6 +115,6 @@ class ErdemApp(App):
     def on_mount(self) -> None:
         self.push_screen("home")
 
+app = ErdemApp()
 if __name__ == "__main__":
-    app = ErdemApp()
     app.run()

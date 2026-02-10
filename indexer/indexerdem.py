@@ -8,13 +8,15 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
+from .errors import ConstructorPreferred
+
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import StrEnum
 from importlib import import_module
-from typing import Any, Iterable, Optional, List, Set, Tuple, Union
+from typing import Any, cast, Iterable, Optional, List, Set, Tuple, Union
 
 import locale as pylocale
 import logging
@@ -75,6 +77,19 @@ class SQLiteDataClass(ABC):
         """
         pass
 
+    @staticmethod
+    @abstractmethod
+    def from_sqlite_record(record: tuple[Any, ...]) -> "SQLiteDataClass":
+        """
+        Construct an instance of this class from the result of an SQLite query.
+        The order of data in `record` would vary per class and should be noted
+        down.
+
+        If you prefer that instances be constructed with the auto-generated
+        constructor, throw a `ConstructorPreferred` error.
+        """
+        pass
+
 @dataclass
 class FileIndexRecord(SQLiteDataClass):
     id: int
@@ -89,16 +104,31 @@ class FileIndexRecord(SQLiteDataClass):
         result = cursor.execute(query).fetchone()
         return FileIndexRecord(*result) if result is not None else None
 
+    @staticmethod
+    def from_sqlite_record(record: tuple[Any, ...]) -> "FileIndexRecord":
+        raise ConstructorPreferred()
+
 @dataclass
-class PersonIndexRecord:
+class PersonIndexRecord(SQLiteDataClass):
     id: int
     firstname: str
     lastname: str
     extraction_rule: NameDecisionRule
+    is_deactivated: int
 
     @staticmethod
-    def from_sqlite_record(record: tuple[int, str, str, str]) -> "PersonIndexRecord":
-        return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]))
+    def fetch(cursor, id) -> Optional["PersonIndexRecord"]:
+        query = f"SELECT * FROM persons WHERE id={id} LIMIT 1"
+        result = cursor.execute(query).fetchone()
+        return PersonIndexRecord.from_sqlite_record(result) if result is not None else None
+
+    @staticmethod
+    def from_sqlite_record(record: tuple[int, str, str, str, int]) -> "PersonIndexRecord":
+        return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]), record[4])
+
+    @property
+    def deactivated(self):
+        return self.is_deactivated == 1
 
     def __str__(self):
         return (
@@ -108,9 +138,31 @@ class PersonIndexRecord:
         )
 
 @dataclass
-class PerformanceIndexRecord:
-    file: FileIndexRecord
-    performer: PersonIndexRecord
+class PerformanceIndexRecord(SQLiteDataClass):
+    # FIXME This typing is hella confusing!
+    files: Union[FileIndexRecord, tuple[Optional[FileIndexRecord], ...]]
+    performers: Union[PersonIndexRecord, tuple[Optional[PersonIndexRecord], ...]]
+
+    @staticmethod
+    def fetch(cursor, root_record: Union[PersonIndexRecord, FileIndexRecord]) -> Optional["PerformanceIndexRecord"]:
+        is_person_rooted = isinstance(root_record, PersonIndexRecord)
+        query = (
+            f"SELECT file_id FROM participation WHERE person_id={root_record.id} LIMIT 1"
+            if is_person_rooted else
+            f"SELECT person_id FROM participation WHERE file_id={root_record.id} LIMIT 1"
+        )
+        result = cursor.execute(query).fetchone()
+        non_root_type = FileIndexRecord if is_person_rooted else PersonIndexRecord
+        non_root_attr = tuple() if result is None else tuple([non_root_type.fetch(cursor, _id) for _id in result])
+        
+        if is_person_rooted:
+            return PerformanceIndexRecord(files=non_root_attr, performers=cast(PersonIndexRecord, root_record)) # type: ignore
+        else:
+            return PerformanceIndexRecord(files=cast(FileIndexRecord, root_record), performers=non_root_attr) # type: ignore
+
+    @staticmethod
+    def from_sqlite_record(record: tuple[Any, ...]) -> "PerformanceIndexRecord":
+        raise ConstructorPreferred()
 
 class Indexerdem(object):
 
