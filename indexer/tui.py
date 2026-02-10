@@ -7,6 +7,7 @@ from textual.widgets import (
     TabPane
 )
 from textual.widgets.option_list import Option
+from typing import cast
 
 from .indexerdem import FileIndexRecord, Indexerdem
 
@@ -19,7 +20,13 @@ class ErdemSearch(HorizontalGroup):
         search_btn = Button("Search", id="search")
         yield search_btn
 
-class ErdemHomeScreen(Screen):
+class ErdemScreen(Screen):
+
+    @property
+    def erdem_app(self) -> "ErdemApp":
+        return cast("ErdemApp", self.app)
+
+class ErdemHomeScreen(ErdemScreen):
     TITLE = "Erdem"
     SUB_TITLE = "Media Notes"
 
@@ -54,11 +61,11 @@ class ErdemHomeScreen(Screen):
         if event.option.id is not None:
             self.app.push_screen(MediaView(int(event.option.id)))
 
-class MediaView(Screen):
+class MediaView(ErdemScreen):
 
     def __init__(self, id: int):
         super().__init__()
-        self.record = FileIndexRecord.fetch(self.app.index.conn.cursor(), id)
+        self.record = FileIndexRecord.fetch(self.erdem_app.index.conn.cursor(), id)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -69,7 +76,7 @@ class MediaView(Screen):
         self.title = "Erdem"
         self.sub_title = f"Media Notes - {self.title}"
 
-class PerformerView(Screen):
+class PerformerView(ErdemScreen):
 
     def __init__(self, performer_name: str):
         super().__init__()
