@@ -54,7 +54,7 @@ class ErdemHomeScreen(ErdemScreen):
     @on(OptionList.OptionSelected, "#performers-list")
     async def performer_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option.id is not None:
-            self.app.push_screen(PerformerView(event.option.id))
+            self.app.push_screen(PerformerView(int(event.option.id)))
 
     @on(OptionList.OptionSelected, "#media-list")
     async def media_selected(self, event: OptionList.OptionSelected) -> None:
@@ -67,10 +67,11 @@ class MediaView(ErdemScreen):
         super().__init__()
         self.record = FileIndexRecord.fetch(self.erdem_app.index.conn.cursor(), id)
         self.is_error_state = self.record is None
-        if not self.is_error_state:
+        # Don't use is_error_state for mypy
+        if self.record is not None:
             performers_result = PerformanceIndexRecord.fetch(
                 self.erdem_app.index.conn.cursor(),
-                self.record # type: ignore
+                self.record
             )
             self.performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
 
@@ -89,18 +90,32 @@ class MediaView(ErdemScreen):
 
 class PerformerView(ErdemScreen):
 
-    def __init__(self, performer_name: str):
+    def __init__(self, performer_id: int):
         super().__init__()
-        self.performer_name = performer_name
+        self.performer = PersonIndexRecord.fetch(
+            self.erdem_app.index.conn.cursor(), performer_id
+        )
+        self.is_error_state = self.performer is None
+        # Don't use is_error_state for mypy
+        if self.performer is not None:
+            performances = PerformanceIndexRecord.fetch(
+                self.erdem_app.index.conn.cursor(),
+                self.performer
+            )
+            self.performances = cast(tuple[Optional[FileIndexRecord], ...], performances.files if performances is not None else tuple())
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(f"[h1]{self.performer_name}[/h1]")
+        yield Static(f"{self.performer}")
+        yield OptionList(
+            *tuple(Option(str(_file)) for _file in self.performances),
+            id="performances-list"
+        )
         yield Footer()
 
     def on_mount(self) -> None:
         self.title = "Erdem"
-        self.sub_title = f"Performer Notes - {self.performer_name}"
+        self.sub_title = f"Performer Notes - {self.performer}"
 
 class ErdemApp(App):
 

@@ -108,6 +108,9 @@ class FileIndexRecord(SQLiteDataClass):
     def from_sqlite_record(record: tuple[Any, ...]) -> "FileIndexRecord":
         raise ConstructorPreferred()
 
+    def __str__(self):
+        return self.filename
+
 @dataclass
 class PersonIndexRecord(SQLiteDataClass):
     id: int
@@ -147,13 +150,13 @@ class PerformanceIndexRecord(SQLiteDataClass):
     def fetch(cursor, root_record: Union[PersonIndexRecord, FileIndexRecord]) -> Optional["PerformanceIndexRecord"]:
         is_person_rooted = isinstance(root_record, PersonIndexRecord)
         query = (
-            f"SELECT file_id FROM participation WHERE person_id={root_record.id} LIMIT 1"
+            f"SELECT file_id FROM participation WHERE person_id={root_record.id}"
             if is_person_rooted else
-            f"SELECT person_id FROM participation WHERE file_id={root_record.id} LIMIT 1"
+            f"SELECT person_id FROM participation WHERE file_id={root_record.id}"
         )
-        result = cursor.execute(query).fetchone()
+        result = cursor.execute(query).fetchall()
         non_root_type = FileIndexRecord if is_person_rooted else PersonIndexRecord
-        non_root_attr = tuple() if result is None else tuple([non_root_type.fetch(cursor, _id) for _id in result])
+        non_root_attr = tuple() if result is None else tuple([non_root_type.fetch(cursor, _id[0]) for _id in result if _id is not None])
         
         if is_person_rooted:
             return PerformanceIndexRecord(files=non_root_attr, performers=cast(PersonIndexRecord, root_record)) # type: ignore
