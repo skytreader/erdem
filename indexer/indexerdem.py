@@ -139,20 +139,21 @@ class PersonIndexRecord(SQLiteDataClass):
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
             """INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated)
-            VALUES(?, ?, ? ?)""",
+            VALUES(?, ?, ?, ?)""",
             (self.firstname, self.lastname, str(self.extraction_rule), self.is_deactivated)
         )
         return cursor.lastrowid
 
     @staticmethod
     def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:
+        test = None
         if lastname is not None:
             test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
         else:
             test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
 
         if test:
-            return PersonIndexRecord.from_sqlite_record(test[0])
+            return PersonIndexRecord.from_sqlite_record(test)
         else:
             return None
 
@@ -202,7 +203,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
     def from_sqlite_record(record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
 
-    def insert(self, cursor, extra_args: Optional[PerformanceIndexRecord.ExtraArgs] = None) -> Optional[int]:
+    def insert(self, cursor, extra_args: Optional["PerformanceIndexRecord.ExtraArgs"] = None) -> Optional[int]:
         if extra_args is None:
             raise ValueError("extra_args can't be None")
 
@@ -217,7 +218,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             if len(self.performers) != len(extra_args.certainties):
                 raise ValueError("performers and certainties are not the same length")
 
-            val_tuples = ((p, root_val.id, c) for p, c in zip(self.performers, extra_args.certainties))
+            val_tuples = ((p.id, root_val.id, c) for p, c in zip(self.performers, extra_args.certainties))
             cursor.executemany(query, val_tuples)
         elif isinstance(self.files, Iterable):
             # self.performers is root
