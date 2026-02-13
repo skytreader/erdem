@@ -8,7 +8,7 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
-from .errors import ConstructorPreferred
+from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
@@ -89,6 +89,10 @@ class SQLiteDataClass(ABC):
         constructor, throw a `ConstructorPreferred` error.
         """
         pass
+    
+    @abstractmethod
+    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        pass
 
 @dataclass
 class FileIndexRecord(SQLiteDataClass):
@@ -108,14 +112,17 @@ class FileIndexRecord(SQLiteDataClass):
     def from_sqlite_record(record: tuple[Any, ...]) -> "FileIndexRecord":
         raise ConstructorPreferred()
 
+    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        pass
+
     def __str__(self):
         return self.filename
 
 @dataclass
 class PersonIndexRecord(SQLiteDataClass):
-    id: int
+    id: Optional[int]
     firstname: str
-    lastname: str
+    lastname: Optional[str]
     extraction_rule: NameDecisionRule
     is_deactivated: int
 
@@ -128,6 +135,26 @@ class PersonIndexRecord(SQLiteDataClass):
     @staticmethod
     def from_sqlite_record(record: tuple[int, str, str, str, int]) -> "PersonIndexRecord":
         return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]), record[4])
+
+    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        cursor.execute(
+            """INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated)
+            VALUES(?, ?, ? ?)""",
+            (self.firstname, self.lastname, str(self.extraction_rule), self.is_deactivated)
+        )
+        return cursor.lastrowid
+
+    @staticmethod
+    def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:
+        if lastname is not None:
+            test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
+        else:
+            test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
+
+        if test:
+            return PersonIndexRecord.from_sqlite_record(test[0])
+        else:
+            return None
 
     @property
     def deactivated(self):
@@ -145,6 +172,14 @@ class PerformanceIndexRecord(SQLiteDataClass):
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[Optional[FileIndexRecord], ...]]
     performers: Union[PersonIndexRecord, tuple[Optional[PersonIndexRecord], ...]]
+
+    @dataclass
+    class ExtraArgs:
+        certainties: tuple[int, ...]
+
+        def __post_init__(self):
+            for c in self.certainties:
+                assert c == 0 or c == 1
 
     @staticmethod
     def fetch(cursor, root_record: Union[PersonIndexRecord, FileIndexRecord]) -> Optional["PerformanceIndexRecord"]:
@@ -166,6 +201,34 @@ class PerformanceIndexRecord(SQLiteDataClass):
     @staticmethod
     def from_sqlite_record(record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
+
+    def insert(self, cursor, extra_args: Optional[PerformanceIndexRecord.ExtraArgs] = None) -> Optional[int]:
+        if extra_args is None:
+            raise ValueError("extra_args can't be None")
+
+        if isinstance(self.files, tuple) and isinstance(self.performers, tuple):
+            raise InvalidDataClassState("record is not rooted, both files and performers are collections")
+        query = """
+            INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);
+        """
+        if isinstance(self.performers, Iterable):
+            # self.files is root
+            root_val = cast(FileIndexRecord, self.files)
+            if len(self.performers) != len(extra_args.certainties):
+                raise ValueError("performers and certainties are not the same length")
+
+            val_tuples = ((p, root_val.id, c) for p, c in zip(self.performers, extra_args.certainties))
+            cursor.executemany(query, val_tuples)
+        elif isinstance(self.files, Iterable):
+            # self.performers is root
+            root_file = cast(PersonIndexRecord, self.performers)
+            if len(self.files) != len(extra_args.certainties):
+                raise ValueError("files and certainties are not the same length")
+
+            val_tuples_file = ((root_file.id, f, c) for f, c in zip(self.files, extra_args.certainties))
+            cursor.executemany(query, val_tuples_file)
+
+        return cursor.lastrowid
 
 class Indexerdem(object):
 
@@ -218,7 +281,9 @@ class Indexerdem(object):
                            is_deactivated TINYINT DEFAULT 0 NOT NULL,
                            UNIQUE(firstname, lastname));""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS participation
-                          (person_id INTEGER, file_id INTEGER, is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
+                          (person_id INTEGER,
+                           file_id INTEGER,
+                           is_certain INTEGER NOT NULL DEFAULT {is_certain_default},
                            FOREIGN KEY(person_id) REFERENCES persons(id),
                            FOREIGN KEY(file_id) REFERENCES files(id),
                            UNIQUE(person_id, file_id))""".format(is_certain_default=Indexerdem.SQLITE_TRUE))
@@ -308,7 +373,7 @@ class Indexerdem(object):
 
         try:
             cleaned = self.__normalize_filename(filename)
-            file_id: Union[int, None] = -1
+            file_id: Optional[int] = -1
             cursor = self.conn.cursor()
             canon_fullpath = make_canonical(fullpath)
             try:
@@ -319,25 +384,39 @@ class Indexerdem(object):
                 logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
             names = self.__find_names(cleaned)
             logger.info("'%s' has the ff. names: %s" % (filename, names))
+            persons = []
+            certainties = []
 
             for name in names:
                 if len(name) == 3:
-                    person_id: Optional[int] = self.__get_person_id(cursor, name[0], name[1])
-                    if person_id is None:
-                        person = (name[0], name[1], name[2].value)
-                        cursor.execute("INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated) VALUES (?, ?, ?, 0)", person)
-                        person_id = cursor.lastrowid
-
-                    certainty = Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE
-                    try:
-                        cursor.execute(
-                            "INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);",
-                            (person_id, file_id, certainty)
+                    person = PersonIndexRecord.find_by_name(cursor, name[0], name[1])
+                    if person is None:
+                        new_person = PersonIndexRecord(
+                            firstname=name[0],
+                            lastname=name[1],
+                            extraction_rule=name[2],
+                            is_deactivated=0,
+                            id=None
                         )
-                    except sqlite3.IntegrityError:
-                        logger.warn("Name previously indexed for file: " + str(name))
+                        person_id = new_person.insert(cursor)
+
+                        if person_id is not None:
+                            persons.append(person_id)
+                            certainties.append(Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE)
                 else:
                     logger.error("Found an odd name: %s" % str(name))
+
+            if file_id is not None and file_id != -1:
+                file_record = FileIndexRecord.fetch(cursor, file_id)
+                if file_record is not None:
+                    perf_record = PerformanceIndexRecord(
+                        files=file_record,
+                        performers=tuple(PersonIndexRecord.fetch(cursor, pid) for pid in persons)
+                    )
+                    perf_record.insert(
+                        cursor,
+                        PerformanceIndexRecord.ExtraArgs(certainties=tuple(certainties))
+                    )
         except:
             logger.exception("Ran into some problems...")
         finally:
