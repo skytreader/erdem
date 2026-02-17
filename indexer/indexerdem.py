@@ -171,8 +171,8 @@ class PersonIndexRecord(SQLiteDataClass):
 @dataclass
 class PerformanceIndexRecord(SQLiteDataClass):
     # FIXME This typing is hella confusing!
-    files: Union[FileIndexRecord, tuple[Optional[FileIndexRecord], ...]]
-    performers: Union[PersonIndexRecord, tuple[Optional[PersonIndexRecord], ...]]
+    files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
+    performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
 
     @dataclass
     class ExtraArgs:
@@ -411,11 +411,10 @@ class Indexerdem(object):
                     logger.error("Found an odd name: %s" % str(name))
 
             if file_id is not None and file_id != -1:
-                file_record = FileIndexRecord.fetch(cursor, file_id)
-                if file_record is not None:
+                if (file_record := FileIndexRecord.fetch(cursor, file_id)) is not None:
                     perf_record = PerformanceIndexRecord(
                         files=file_record,
-                        performers=tuple(PersonIndexRecord.fetch(cursor, pid) for pid in persons)
+                        performers=tuple(spam for spam in (PersonIndexRecord.fetch(cursor, pid) for pid in persons) if spam is not None)
                     )
                     try:
                         perf_record.insert(
@@ -447,7 +446,7 @@ class Indexerdem(object):
     def __sqliteify(self, b: bool) -> int:
         return Indexerdem.SQLITE_TRUE if b else Indexerdem.SQLITE_FALSE
 
-    def fetch_files(self, limit=None) -> tuple[FileIndexRecord, ...]:
+    def fetch_files(self, limit: Optional[int] = None) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
         query = (
             f"SELECT * FROM files LIMIT={limit}"
@@ -470,6 +469,11 @@ class Indexerdem(object):
             "SELECT * FROM persons"
         )
         return tuple(PersonIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
+    
+    def search(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
+        cursor = self.conn.cursor()
+        query = f"SELECT * FROM files WHERE filename LIKE '%{searchterm}%'"
+        return tuple(FileIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
