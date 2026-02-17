@@ -404,6 +404,9 @@ class Indexerdem(object):
                         if person_id is not None:
                             persons.append(person_id)
                             certainties.append(Indexerdem.SQLITE_TRUE if decide_certainty(name) else Indexerdem.SQLITE_FALSE)
+                    elif person.id is not None:
+                        persons.append(person.id)
+                        certainties.append(Indexerdem.SQLITE_TRUE if person.extraction_rule is NameDecisionRule.ALMOST_CERTAIN else Indexerdem.SQLITE_FALSE)
                 else:
                     logger.error("Found an odd name: %s" % str(name))
 
@@ -414,10 +417,13 @@ class Indexerdem(object):
                         files=file_record,
                         performers=tuple(PersonIndexRecord.fetch(cursor, pid) for pid in persons)
                     )
-                    perf_record.insert(
-                        cursor,
-                        PerformanceIndexRecord.ExtraArgs(certainties=tuple(certainties))
-                    )
+                    try:
+                        perf_record.insert(
+                            cursor,
+                            PerformanceIndexRecord.ExtraArgs(certainties=tuple(certainties))
+                        )
+                    except sqlite3.IntegrityError:
+                        logger.warn(f"Some persons are already associated with {file_record}")
         except:
             logger.exception("Ran into some problems...")
         finally:
