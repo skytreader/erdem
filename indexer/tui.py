@@ -1,3 +1,4 @@
+from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
@@ -9,7 +10,18 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 from typing import cast, Optional
 
+import traceback
+
 from .indexerdem import FileIndexRecord, Indexerdem, PerformanceIndexRecord, PersonIndexRecord
+
+# Source - https://stackoverflow.com/a/76333127
+# Posted by winwin
+# Retrieved 2026-02-17, License - CC BY-SA 4.0
+def error_string(ex: Exception) -> str:
+    return '\n'.join([
+        ''.join(traceback.format_exception_only(None, ex)).strip(),
+        ''.join(traceback.format_exception(None, ex, ex.__traceback__)).strip()
+    ])
 
 class ErdemSearch(HorizontalGroup):
 
@@ -95,22 +107,34 @@ class PerformerView(ErdemScreen):
         self.performer = PersonIndexRecord.fetch(
             self.erdem_app.index.conn.cursor(), performer_id
         )
-        self.is_error_state = self.performer is None
-        # Don't use is_error_state for mypy
+        self.error_str: Optional[str] = None
+
         if self.performer is not None:
-            performances = PerformanceIndexRecord.fetch(
-                self.erdem_app.index.conn.cursor(),
-                self.performer
-            )
-            self.performances = cast(tuple[Optional[FileIndexRecord], ...], performances.files if performances is not None else tuple())
+            try:
+                performances = PerformanceIndexRecord.fetch(
+                    self.erdem_app.index.conn.cursor(),
+                    self.performer
+                )
+                self.performances = cast(tuple[Optional[FileIndexRecord], ...], performances.files if performances is not None else tuple())
+            except OperationalError as e:
+                self.error_str = error_string(e)
+        else:
+            self.error_str = "Performer not found"
 
     def compose(self) -> ComposeResult:
         yield Header()
         yield Static(f"{self.performer}")
-        yield OptionList(
-            *tuple(Option(str(_file)) for _file in self.performances),
-            id="performances-list"
-        )
+        if self.error_str is None:
+            yield OptionList(
+                *tuple(Option(str(_file)) for _file in self.performances),
+                id="performances-list"
+            )
+        else:
+            error = Static(f"Error: {self.error_str}")
+            error.styles.background = "red"
+            error.styles.color = "white"
+            error.styles.padding = (1, 2)
+            yield error
         yield Footer()
 
     def on_mount(self) -> None:
