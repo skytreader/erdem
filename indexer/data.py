@@ -42,11 +42,16 @@ class SQLiteDataClass(ABC):
     
     @abstractmethod
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        """
+        Insert this record into the database. Return the id.
+
+        Side-effect: overwrite this object's id field with the generated id.
+        """
         pass
 
 @dataclass
 class FileIndexRecord(SQLiteDataClass):
-    id: int
+    id: Optional[int]
     filename: str
     fullpath: str
     rating: int
@@ -63,10 +68,26 @@ class FileIndexRecord(SQLiteDataClass):
         raise ConstructorPreferred()
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
-        pass
+        cursor.execute(
+            "INSERT INTO files (filename, fullpath, rating, review) VALUES (?, ?, ?, ?)",
+            (self.filename, self.fullpath, self.rating, self.review)
+        )
+        self.id = cursor.lastrowid
+        return self.id
 
     def __str__(self):
         return self.filename
+    
+    def __eq__(self, o):
+        return all(
+            (
+                self.id == o.id,
+                self.filename == o.filename,
+                self.fullpath == o.fullpath,
+                self.rating == o.rating,
+                self.review == o.review
+            )
+        )
 
 @dataclass
 class PersonIndexRecord(SQLiteDataClass):
