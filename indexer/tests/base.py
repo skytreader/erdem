@@ -17,6 +17,11 @@ class SQLiteTest(unittest.TestCase):
         self.indexerdem.init()
 
     def tearDown(self):
-        self.cursor.execute("DROP TABLE files;")
-        self.cursor.execute("DROP TABLE persons;")
-        self.cursor.execute("DROP TABLE participation;")
+        self.cursor.executescript(
+            """
+            DROP TABLE files;
+            DROP TABLE persons;
+            DROP TABLE participation;
+            """
+        )
+

@@ -43,9 +43,13 @@ class SQLiteDataClass(ABC):
     @abstractmethod
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         """
-        Insert this record into the database. Return the id.
+        Insert this record into the database. Return the id or, for composite
+        records, the number of inserted rows.
 
-        Side-effect: overwrite this object's id field with the generated id.
+        > TODO: Make an actual distinction between the two return types?
+
+        Side-effect: overwrite this object's id field with the generated id,
+        when applicable.
         """
         pass
 
@@ -77,17 +81,6 @@ class FileIndexRecord(SQLiteDataClass):
 
     def __str__(self):
         return self.filename
-    
-    def __eq__(self, o):
-        return all(
-            (
-                self.id == o.id,
-                self.filename == o.filename,
-                self.fullpath == o.fullpath,
-                self.rating == o.rating,
-                self.review == o.review
-            )
-        )
 
 @dataclass
 class PersonIndexRecord(SQLiteDataClass):
@@ -113,7 +106,8 @@ class PersonIndexRecord(SQLiteDataClass):
             VALUES(?, ?, ?, ?)""",
             (self.firstname, self.lastname, str(self.extraction_rule), self.is_deactivated)
         )
-        return cursor.lastrowid
+        self.id = cursor.lastrowid
+        return self.id
 
     @staticmethod
     def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:
