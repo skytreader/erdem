@@ -33,6 +33,7 @@ class ErdemSearch(HorizontalGroup):
         yield search_btn
 
 class ErdemScreen(Screen):
+    BINDINGS = [("backspace", "app.pop_screen", "Back")]
 
     @property
     def erdem_app(self) -> "ErdemApp":
