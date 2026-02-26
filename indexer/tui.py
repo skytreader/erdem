@@ -27,10 +27,11 @@ class ErdemSearch(HorizontalGroup):
 
     def compose(self) -> ComposeResult:
         search_box = Input(placeholder="Search by title, tag, or performer", id="search-box")
-        search_box.styles.width = "93%"
         yield search_box
-        search_btn = Button("Search", id="search")
-        yield search_btn
+
+    @on(Input.Submitted, "#search-box")
+    async def search(self, event: Input.Submitted) -> None:
+        pass
 
 class ErdemScreen(Screen):
     BINDINGS = [("backspace", "app.pop_screen", "Back")]
@@ -46,20 +47,23 @@ class ErdemHomeScreen(ErdemScreen):
     def __init__(self):
         super().__init__()
         self.titles = self.app.index.fetch_files()
+        self.shown_titles = OptionList(
+            *tuple(Option(title.filename, id=title.id) for title in self.titles),
+            id="media-list"
+        )
         self.performers = self.app.index.fetch_persons(False)
+        self.shown_performers = self.performers
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield ErdemSearch()
+        #yield ErdemSearch()
+        yield Input(placeholder="Search by title, tag, or performer", id="search-box")
         with TabbedContent(initial="media-tab"):
             with TabPane("Media", id="media-tab"):
-                yield OptionList(
-                    *tuple(Option(title.filename, id=title.id) for title in self.titles),
-                    id="media-list"
-                )
+                yield self.shown_titles
             with TabPane("Performers", id="performers-tab"):
                 yield OptionList(
-                    *tuple(Option(str(p), id=p.id) for p in self.performers),
+                    *tuple(Option(str(p), id=p.id) for p in self.shown_performers),
                     id="performers-list"
                 )
         yield Footer()
@@ -73,6 +77,13 @@ class ErdemHomeScreen(ErdemScreen):
     async def media_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option.id is not None:
             self.app.push_screen(MediaView(int(event.option.id)))
+
+    @on(Input.Changed, "#search-box")
+    async def search(self, event: Input.Changed) -> None:
+        if len(event.input.value) >= 3:
+            search_results = self.app.index.search_files(event.input.value)
+            self.shown_titles.clear_options()
+            self.shown_titles.add_options(tuple(Option(title.filename, id=title.id) for title in search_results))
 
 class MediaView(ErdemScreen):
 

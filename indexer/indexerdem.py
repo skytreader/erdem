@@ -290,10 +290,10 @@ class Indexerdem(object):
         )
         return tuple(PersonIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
     
-    def search(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
+    def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
         query = f"SELECT * FROM files WHERE filename LIKE '%{searchterm}%'"
-        return tuple(FileIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
+        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
