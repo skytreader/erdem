@@ -295,6 +295,11 @@ class Indexerdem(object):
         query = f"SELECT * FROM files WHERE filename LIKE '%{searchterm}%'"
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
 
+    def search_performers(self, searchterm: str) -> Union[tuple[PersonIndexRecord, ...], tuple]:
+        cursor = self.conn.cursor()
+        query = f"SELECT * FROM persons WHERE firstname LIKE '%{searchterm}%' OR lastname LIKE '%{searchterm}%'"
+        return tuple(PersonIndexRecord(*row) for row in cursor.execute(query).fetchall())
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="indexer for erdem.")
     parser.add_argument(

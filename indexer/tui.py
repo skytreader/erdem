@@ -8,7 +8,7 @@ from textual.widgets import (
     TabPane
 )
 from textual.widgets.option_list import Option
-from typing import cast, Optional
+from typing import cast, Iterable, Optional
 
 import traceback
 
@@ -48,11 +48,15 @@ class ErdemHomeScreen(ErdemScreen):
         super().__init__()
         self.titles = self.app.index.fetch_files()
         self.shown_titles = OptionList(
-            *tuple(Option(title.filename, id=title.id) for title in self.titles),
-            id="media-list"
+            *self.__make_options_titles(self.titles), id="media-list"
         )
         self.performers = self.app.index.fetch_persons(False)
         self.shown_performers = self.performers
+
+    def __make_options_titles(self, titles: Iterable[FileIndexRecord]) -> tuple[Option, ...]:
+        return tuple(
+            Option(title.filename, id=str(title.id)) for title in titles
+        )
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -80,10 +84,14 @@ class ErdemHomeScreen(ErdemScreen):
 
     @on(Input.Changed, "#search-box")
     async def search(self, event: Input.Changed) -> None:
-        if len(event.input.value) >= 3:
-            search_results = self.app.index.search_files(event.input.value)
+        is_search_worthy = len(event.input.value) >= 3
+        if is_search_worthy:
+            search_results = self.erdem_app.index.search_files(event.input.value)
             self.shown_titles.clear_options()
-            self.shown_titles.add_options(tuple(Option(title.filename, id=title.id) for title in search_results))
+            self.shown_titles.add_options(self.__make_options_titles(search_results))
+        else:
+            self.shown_titles.clear_options()
+            self.shown_titles.add_options(self.__make_options_titles(self.titles))
 
 class MediaView(ErdemScreen):
 
