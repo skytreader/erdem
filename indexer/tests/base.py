@@ -13,6 +13,11 @@ class SQLiteTest(unittest.TestCase):
     def cursor(self):
         return self.indexerdem.conn.cursor()
 
+    def insert(self, constructor, *args):
+        obj = constructor(*args)
+        obj.insert(self.cursor)
+        return obj
+
     def setUp(self):
         self.indexerdem.init()
 
@@ -24,4 +29,3 @@ class SQLiteTest(unittest.TestCase):
             DROP TABLE participation;
             """
         )
-
