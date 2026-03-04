@@ -51,25 +51,29 @@ class ErdemHomeScreen(ErdemScreen):
             *self.__make_options_titles(self.titles), id="media-list"
         )
         self.performers = self.app.index.fetch_persons(False)
-        self.shown_performers = self.performers
+        self.shown_performers = OptionList(
+            *self.__make_options_performers(self.performers), id="performer-list"
+        )
+        self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
 
     def __make_options_titles(self, titles: Iterable[FileIndexRecord]) -> tuple[Option, ...]:
         return tuple(
             Option(title.filename, id=str(title.id)) for title in titles
         )
 
+    def __make_options_performers(self, performers: Iterable[PersonIndexRecord]) -> tuple[Option, ...]:
+        return tuple(
+            Option(str(p), id=p.id) for p in performers
+        )
+
     def compose(self) -> ComposeResult:
         yield Header()
-        #yield ErdemSearch()
         yield Input(placeholder="Search by title, tag, or performer", id="search-box")
-        with TabbedContent(initial="media-tab"):
+        with self.list_tabs:
             with TabPane("Media", id="media-tab"):
                 yield self.shown_titles
             with TabPane("Performers", id="performers-tab"):
-                yield OptionList(
-                    *tuple(Option(str(p), id=p.id) for p in self.shown_performers),
-                    id="performers-list"
-                )
+                yield self.shown_performers
         yield Footer()
 
     @on(OptionList.OptionSelected, "#performers-list")
@@ -84,14 +88,31 @@ class ErdemHomeScreen(ErdemScreen):
 
     @on(Input.Changed, "#search-box")
     async def search(self, event: Input.Changed) -> None:
-        is_search_worthy = len(event.input.value) >= 3
+        self.search_worker(event.input.value)
+
+    @on(TabbedContent.TabActivated, "#list-tabs")
+    async def tab_switched(self, event: Input.Changed) -> None:
+        search_input: Input = self.query_one("#search-box")
+        self.search_worker(search_input.value)
+
+    def search_worker(self, query: str) -> None:
+        is_search_worthy = len(query) >= 3
         if is_search_worthy:
-            search_results = self.erdem_app.index.search_files(event.input.value)
-            self.shown_titles.clear_options()
-            self.shown_titles.add_options(self.__make_options_titles(search_results))
+            if self.list_tabs.active == "media-tab":
+                search_results = self.erdem_app.index.search_files(query)
+                self.shown_titles.clear_options()
+                self.shown_titles.add_options(self.__make_options_titles(search_results))
+            elif self.list_tabs.active == "performers-tab":
+                search_results = self.erdem_app.index.search_performers(query)
+                self.shown_performers.clear_options()
+                self.shown_performers.add_options(self.__make_options_performers(search_results))
         else:
-            self.shown_titles.clear_options()
-            self.shown_titles.add_options(self.__make_options_titles(self.titles))
+            if self.list_tabs.active == "media-tab":
+                self.shown_titles.clear_options()
+                self.shown_titles.add_options(self.__make_options_titles(self.titles))
+            elif self.list_tabs.active == "performers-tab":
+                self.shown_performers.clear_options()
+                self.shown_performers.add_options(self.__make_options_performers(self.performers))
 
 class MediaView(ErdemScreen):
 
