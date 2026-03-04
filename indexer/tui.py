@@ -43,6 +43,7 @@ class ErdemScreen(Screen):
 class ErdemHomeScreen(ErdemScreen):
     TITLE = "Erdem"
     SUB_TITLE = "Media Notes"
+    NO_RESULTS_FOUND = Option("No results found.", disabled=True)
 
     def __init__(self):
         super().__init__()
@@ -101,11 +102,17 @@ class ErdemHomeScreen(ErdemScreen):
             if self.list_tabs.active == "media-tab":
                 search_results = self.erdem_app.index.search_files(query)
                 self.shown_titles.clear_options()
-                self.shown_titles.add_options(self.__make_options_titles(search_results))
+                if search_results:
+                    self.shown_titles.add_options(self.__make_options_titles(search_results))
+                else:
+                    self.shown_titles.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
             elif self.list_tabs.active == "performers-tab":
                 search_results = self.erdem_app.index.search_performers(query)
                 self.shown_performers.clear_options()
-                self.shown_performers.add_options(self.__make_options_performers(search_results))
+                if search_results:
+                    self.shown_performers.add_options(self.__make_options_performers(search_results))
+                else:
+                    self.shown_performers.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
         else:
             if self.list_tabs.active == "media-tab":
                 self.shown_titles.clear_options()
