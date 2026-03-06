@@ -13,6 +13,7 @@ from typing import cast, Iterable, Optional
 import traceback
 
 from .indexerdem import FileIndexRecord, Indexerdem, PerformanceIndexRecord, PersonIndexRecord
+from .errors import InvalidDataClassState
 
 # Source - https://stackoverflow.com/a/76333127
 # Posted by winwin
@@ -51,6 +52,10 @@ class ErdemHomeScreen(ErdemScreen):
         self.shown_titles = OptionList(
             *self.__make_options_titles(self.titles), id="media-list"
         )
+        # No idea what this unit is supposed to be. Could be "cells" which in
+        # the context of an OptionList I guess would be "list items" but don't
+        # quote me on that. Still, achieves what I want for now.
+        self.shown_titles.styles.height = "30"
         self.performers = self.app.index.fetch_persons(False)
         self.shown_performers = OptionList(
             *self.__make_options_performers(self.performers), id="performer-list"
@@ -58,14 +63,24 @@ class ErdemHomeScreen(ErdemScreen):
         self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
 
     def __make_options_titles(self, titles: Iterable[FileIndexRecord]) -> tuple[Option, ...]:
-        return tuple(
-            Option(title.filename, id=str(title.id)) for title in titles
-        )
+        title_options = []
+        for title in titles:
+            if title.id is None:
+                raise InvalidDataClassState(f"id is None for {title}")
+
+            title_options.append(Option(title.filename, id=str(title.id)))
+
+        return tuple(title_options)
 
     def __make_options_performers(self, performers: Iterable[PersonIndexRecord]) -> tuple[Option, ...]:
-        return tuple(
-            Option(str(p), id=p.id) for p in performers
-        )
+        performer_options = []
+        for p in performers:
+            if p.id is None:
+                raise InvalidDataClassState(f"id is None for {p}")
+
+            performer_options.append(Option(str(p), id=str(p.id)))
+
+        return tuple(performer_options)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -93,7 +108,7 @@ class ErdemHomeScreen(ErdemScreen):
 
     @on(TabbedContent.TabActivated, "#list-tabs")
     async def tab_switched(self, event: Input.Changed) -> None:
-        search_input: Input = self.query_one("#search-box")
+        search_input: Input = cast(Input, self.query_one("#search-box"))
         self.search_worker(search_input.value)
 
     def search_worker(self, query: str) -> None:
@@ -121,6 +136,23 @@ class ErdemHomeScreen(ErdemScreen):
                 self.shown_performers.clear_options()
                 self.shown_performers.add_options(self.__make_options_performers(self.performers))
 
+class OptionListOperations(HorizontalGroup):
+
+    def compose(self) -> ComposeResult:
+        yield Button("+", id=f"{self.id}-option-list-add")
+        yield Button("x", variant="warning", id=f"{self.id}-option-list-delete")
+
+class RecordViewHeadline(HorizontalGroup):
+
+    def __init__(self, record_name: str):
+        super().__init__()
+        self.record_name = record_name
+
+    def compose(self) -> ComposeResult:
+        yield Label(self.record_name)
+        yield Button("Save", id=f"{self.id}-rvhl-save")
+        yield Button("Delete", variant="warning", id=f"{self.id}-rvhl-del")
+
 class MediaView(ErdemScreen):
 
     def __init__(self, id: int):
@@ -137,11 +169,13 @@ class MediaView(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Static(self.record.filename if self.record is not None else "Unknown")
+        yield RecordViewHeadline(self.record.filename if self.record is not None else "Unknown")
+        yield Label("Performers:")
         yield OptionList(
             *tuple(Option(str(performer)) for performer in self.performers),
             id="performers-list"
         )
+        yield OptionListOperations()
         yield Footer()
 
     def on_mount(self) -> None:
