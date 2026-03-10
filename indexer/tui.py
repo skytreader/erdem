@@ -2,13 +2,15 @@ from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
+from textual.reactive import reactive
 from textual.screen import Screen
+from textual.widget import Widget
 from textual.widgets import (
     Button, Footer, Header, Input, Label, OptionList, Static, TabbedContent,
     TabPane
 )
 from textual.widgets.option_list import Option
-from typing import cast, Iterable, Optional
+from typing import Any, cast, Iterable, Optional
 
 import traceback
 
@@ -24,15 +26,21 @@ def error_string(ex: Exception) -> str:
         ''.join(traceback.format_exception(None, ex, ex.__traceback__)).strip()
     ])
 
-class ErdemSearch(HorizontalGroup):
+class Dynamic(Widget):
+    """
+    In contract to `Static`, this label is dynamic.
+    """
+    DEFAULT_CSS = """
+    Dynamic {
+        height: auto;
+        width: auto;
+    }
+    """
+    
+    text: reactive[str] = reactive("text")
 
-    def compose(self) -> ComposeResult:
-        search_box = Input(placeholder="Search by title, tag, or performer", id="search-box")
-        yield search_box
-
-    @on(Input.Submitted, "#search-box")
-    async def search(self, event: Input.Submitted) -> None:
-        pass
+    def render(self) -> str:
+        return self.text
 
 class ErdemScreen(Screen):
     BINDINGS = [("backspace", "app.pop_screen", "Back")]
@@ -48,19 +56,42 @@ class ErdemHomeScreen(ErdemScreen):
 
     def __init__(self):
         super().__init__()
-        self.titles = self.app.index.fetch_files()
+        self.TITLES = self.app.index.fetch_files()
+        self.title_count = Dynamic()
+        self.__reset_title_list()
+        self.PERFORMERS = self.app.index.fetch_persons(False)
+        self.performer_count = Dynamic()
+        self.__reset_performer_list()
+        self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
+
+    def __reset_title_list(self):
+        """
+        Assumes that the following fields are set:
+
+        - TITLES
+        - title_count
+        """
         self.shown_titles = OptionList(
-            *self.__make_options_titles(self.titles), id="media-list"
+            *self.__make_options_titles(self.TITLES), id="media-list"
         )
         # No idea what this unit is supposed to be. Could be "cells" which in
         # the context of an OptionList I guess would be "list items" but don't
         # quote me on that. Still, achieves what I want for now.
         self.shown_titles.styles.height = "30"
-        self.performers = self.app.index.fetch_persons(False)
+        self.title_count.text = self.__make_count_label("title", len(self.TITLES))
+
+    def __reset_performer_list(self):
+        """
+        Assumes that the following fields are set:
+
+        - PERFORMERS
+        - performer_count
+        """
         self.shown_performers = OptionList(
-            *self.__make_options_performers(self.performers), id="performer-list"
+            *self.__make_options_performers(self.PERFORMERS), id="performer-list"
         )
-        self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
+        self.shown_performers.styles.height = "30"
+        self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
 
     def __make_options_titles(self, titles: Iterable[FileIndexRecord]) -> tuple[Option, ...]:
         title_options = []
@@ -71,6 +102,19 @@ class ErdemHomeScreen(ErdemScreen):
             title_options.append(Option(title.filename, id=str(title.id)))
 
         return tuple(title_options)
+
+    def __make_count_label(self, list_noun: str, count: int) -> str:
+        """
+        Create string declaring count of items in the list.
+
+        list_noun - right now, the only use case is either "title" or "performer"
+        which is very easy to pluralize. In the future we might take in a
+        pluralization function.
+        """
+        if count == 1:
+            return f"Showing 1 {list_noun}."
+        else:
+            return f"Showing {count} {list_noun}s."
 
     def __make_options_performers(self, performers: Iterable[PersonIndexRecord]) -> tuple[Option, ...]:
         performer_options = []
@@ -87,8 +131,10 @@ class ErdemHomeScreen(ErdemScreen):
         yield Input(placeholder="Search by title, tag, or performer", id="search-box")
         with self.list_tabs:
             with TabPane("Media", id="media-tab"):
+                yield self.title_count
                 yield self.shown_titles
             with TabPane("Performers", id="performers-tab"):
+                yield self.performer_count
                 yield self.shown_performers
         yield Footer()
 
@@ -117,24 +163,32 @@ class ErdemHomeScreen(ErdemScreen):
             if self.list_tabs.active == "media-tab":
                 search_results = self.erdem_app.index.search_files(query)
                 self.shown_titles.clear_options()
+
                 if search_results:
                     self.shown_titles.add_options(self.__make_options_titles(search_results))
                 else:
                     self.shown_titles.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
+
+                self.title_count.text = self.__make_count_label("title", len(search_results))
             elif self.list_tabs.active == "performers-tab":
                 search_results = self.erdem_app.index.search_performers(query)
                 self.shown_performers.clear_options()
+
                 if search_results:
                     self.shown_performers.add_options(self.__make_options_performers(search_results))
                 else:
                     self.shown_performers.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
+
+                self.title_count.text = self.__make_count_label("performer", len(search_results))
         else:
             if self.list_tabs.active == "media-tab":
                 self.shown_titles.clear_options()
-                self.shown_titles.add_options(self.__make_options_titles(self.titles))
+                self.shown_titles.add_options(self.__make_options_titles(self.TITLES))
+                self.title_count.text = self.__make_count_label("title", len(self.TITLES))
             elif self.list_tabs.active == "performers-tab":
                 self.shown_performers.clear_options()
-                self.shown_performers.add_options(self.__make_options_performers(self.performers))
+                self.shown_performers.add_options(self.__make_options_performers(self.PERFORMERS))
+                self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
 
 class OptionListOperations(HorizontalGroup):
 
