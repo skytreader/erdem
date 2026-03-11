@@ -190,24 +190,9 @@ class ErdemHomeScreen(ErdemScreen):
                 self.shown_performers.add_options(self.__make_options_performers(self.PERFORMERS))
                 self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
 
-class OptionListOperations(HorizontalGroup):
-
-    def compose(self) -> ComposeResult:
-        yield Button("+", id=f"{self.id}-option-list-add")
-        yield Button("x", variant="warning", id=f"{self.id}-option-list-delete")
-
-class RecordViewHeadline(HorizontalGroup):
-
-    def __init__(self, record_name: str):
-        super().__init__()
-        self.record_name = record_name
-
-    def compose(self) -> ComposeResult:
-        yield Label(self.record_name)
-        yield Button("Save", id=f"{self.id}-rvhl-save")
-        yield Button("Delete", variant="warning", id=f"{self.id}-rvhl-del")
-
 class MediaView(ErdemScreen):
+
+    CSS_PATH = "tcss/erdem.tcss"
 
     def __init__(self, id: int):
         super().__init__()
@@ -223,13 +208,20 @@ class MediaView(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield RecordViewHeadline(self.record.filename if self.record is not None else "Unknown")
-        yield Label("Performers:")
+        yield HorizontalGroup(
+            Label(self.record.filename if self.record is not None else "Unknown", id="record-title"),
+            Button("Save", id="save-record", flat=True),
+            Button("Delete", id="delete-record", flat=True)
+        )
+        yield HorizontalGroup(
+            Label("Performers:", classes="actionable-title"),
+            Button("+", id="add-performer", flat=True),
+            Button("x", variant="warning", id="remove-performer", flat=True)
+        )
         yield OptionList(
             *tuple(Option(str(performer)) for performer in self.performers),
             id="performers-list"
         )
-        yield OptionListOperations()
         yield Footer()
 
     def on_mount(self) -> None:

@@ -1,0 +1,10 @@
+Label#record-title {
+    margin: 1 0 0 2;
+    text-style: bold;
+    padding-right: 2;
+}
+
+Label.actionable-title {
+    margin: 1 0 0 2;
+    padding-right: 2;
+}
