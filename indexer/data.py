@@ -54,6 +54,35 @@ class SQLiteDataClass(ABC):
         pass
 
 @dataclass
+class MetadataRecord(SQLiteDataClass):
+    key: str
+    val: str
+
+    @staticmethod
+    def fetch(cursor, id: str) -> Optional["MetadataRecord"]:
+        query = f"SELECT * FROM __metadata WHERE id={id} LIMIT 1"
+        result = cursor.execute(query).fetchone()
+        return MetadataRecord(*result) if result is not None else None
+
+    @staticmethod
+    def from_sqlite_record(record: tuple[any, ...]) -> "MetadataRecord":
+        raise ConstructorPreferred()
+    
+    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        """
+        Since there is no integer id for this table, this only returns either 1
+        or 0 for a successful and unsuccessful insertion respectively.
+        """
+        try:
+            cursor.execute(
+                "INSERT INTO __metadata (key, value) VALUES (?, ?)",
+                (self.key, self.val)
+            )
+            return 1
+        except:
+            return 0
+
+@dataclass
 class FileIndexRecord(SQLiteDataClass):
     id: Optional[int]
     filename: str

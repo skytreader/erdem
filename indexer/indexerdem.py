@@ -8,10 +8,11 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
-from .data import FileIndexRecord, NameDecisionRule, NameTuple, PerformanceIndexRecord, PersonIndexRecord
+from .data import FileIndexRecord, MetadataRecord, NameDecisionRule, NameTuple, PerformanceIndexRecord, PersonIndexRecord
 
 from argparse import ArgumentParser
 from collections import OrderedDict
+from enum import Enum
 from importlib import import_module
 from typing import Any, cast, Iterable, Optional, List, Set, Tuple, Union
 
@@ -51,6 +52,13 @@ logger.setLevel(logging.INFO)
 _loghandler = logging.StreamHandler()
 _loghandler.setFormatter(ColoredLogFormatter())
 logger.addHandler(_loghandler)
+
+class MetadataCheckResult(Enum):
+    COMPLETELY_COMPATIBLE = 1
+    LIKELY_COMPATIBLE = 2
+    INCOMPATIBLE = 3
+    INDETERMINATE = 4
+
 class Indexerdem(object):
 
     SQLITE_TRUE = 1
@@ -58,6 +66,18 @@ class Indexerdem(object):
 
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
     DEFAULT_LOCALES = ("en", "en_GB", "en_US", "en_NZ")
+
+    # The version of the index produced. This will be saved in the DB as
+    # metadata. The major version should guarantee compatibility with similar
+    # major versions of the indexer. The minor version represents changes that
+    # might produce inconsistencies when presenting the data; this usually means
+    # the code handling the data has changed assumptions somewhat. Schema
+    # changes are _always_ major version bumps.
+    INDEX_VERSION = "1.0"
+    # The current version of this indexer. Follows semver. Major versions of
+    # indexer should be able to continously work with similar major versions of
+    # the index.
+    INDEXER_VERSION = "1.0.0"
 
     def __init__(self, index_filename: str, locales: Optional[Iterable[str]] = None, extensions: Optional[Iterable[str]] = None):
         self.conn = sqlite3.connect(index_filename)
@@ -88,6 +108,9 @@ class Indexerdem(object):
         cursor = self.conn.cursor()
 
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("""CREATE TABLE IF NOT EXISTS __metadata
+                          (key TEXT PRIMARY KEY NOT NULL,
+                           value TEXT NOT NULL);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC,
                            filename TEXT UNIQUE NOT NULL,
@@ -108,7 +131,33 @@ class Indexerdem(object):
                            FOREIGN KEY(person_id) REFERENCES persons(id),
                            FOREIGN KEY(file_id) REFERENCES files(id),
                            UNIQUE(person_id, file_id))""".format(is_certain_default=Indexerdem.SQLITE_TRUE))
+        # TODO Handle errors
+        # The idea here is that this should only ever succeed when the index was
+        # first created.
+        MetadataRecord("indexer_version", Indexerdem.INDEXER_VERSION).insert(cursor)
+        MetadataRecord("index_version", Indexerdem.INDEX_VERSION).insert(cursor)
         self.conn.commit()
+
+    def check_compatibility(self) -> MetadataCheckResult:
+        try:
+            index_version = self.fetch_index_version()
+            index_version_parse = index_version.split(".")
+            indexer_version_parse = Indexerdem.INDEX_VERSION.split(".")
+
+            if index_version == Indexerdem.INDEX_VERSION:
+                return MetadataCheckResult.COMPLETELY_COMPATIBLE
+            elif index_version_parse[0] == index_version_parse[0]:
+                return MetadataCheckResult.LIKELY_COMPATIBLE
+            else:
+                return MetadataCheckResult.INCOMPATIBLE
+        except:
+            return MetadataCheckResult.INDETERMINATE
+
+    def fetch_index_version(self) -> Optional[str]:
+        """
+        Fetch the index version of the loaded index.
+        """
+        return MetadataRecord.fetch(self.conn.cursor(), "index_version")
 
     def __normalize_filename(self, filename: str) -> str:
         spam = filename.rsplit(".", 1)

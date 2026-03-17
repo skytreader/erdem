@@ -14,7 +14,8 @@ from typing import Any, cast, Iterable, Optional
 
 import traceback
 
-from .indexerdem import FileIndexRecord, Indexerdem, PerformanceIndexRecord, PersonIndexRecord
+from .data import FileIndexRecord, PerformanceIndexRecord, PersonIndexRecord
+from .indexerdem import Indexerdem, MetadataCheckResult
 from .errors import InvalidDataClassState
 
 # Source - https://stackoverflow.com/a/76333127
@@ -291,6 +292,15 @@ class ErdemApp(App):
     def __init__(self):
         super().__init__()
         self.index = Indexerdem("cache.db")
+        compatibility_check = self.index.check_compatibility()
+        CHECK_TITLE = "Index Compatibility Check"
+
+        if compatibility_check == MetadataCheckResult.COMPLETELY_COMPATIBLE:
+            self.notify("Index compatibility check passed.", title=CHECK_TITLE)
+        elif compatibility_check == MetadataCheckResult.LIKELY_COMPATIBLE:
+            self.notify("Slight compatibility discrepancies detected. Reindex soon.", severity="warning", title=CHECK_TITLE)
+        elif compatibility_check == MetadataCheckResult.INDETERMINATE or compatibility_check == MetadataCheckResult.INCOMPATIBLE:
+            self.notify("Compatibility not guaranteed. Reindexing strongly suggested.", severity="error", title=CHECK_TITLE)
 
     def on_mount(self) -> None:
         self.push_screen("home")
