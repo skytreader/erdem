@@ -135,6 +135,15 @@ class PersonIndexRecord(SQLiteDataClass):
 
 @dataclass
 class PerformanceIndexRecord(SQLiteDataClass):
+    """
+    This relation has two fields: files and performers. Each field can either be
+    a tuple of FileIndexRecords and PersonIndexRecords respectively or just a
+    plain instance of those given types.
+
+    An instance of this class is said to be _rooted_ if and only if one of the
+    two fields is plain non-tuple instance while the other is a tuple.
+    Furthermore, the record is said to be _rooted at_ the non-tuple field.
+    """
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
     performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
@@ -146,6 +155,18 @@ class PerformanceIndexRecord(SQLiteDataClass):
         def __post_init__(self):
             for c in self.certainties:
                 assert c == 0 or c == 1
+
+    def __is_person_rooted(self) -> bool:
+        return (
+            isinstance(self.performers, PersonIndexRecord) and
+            isinstance(self.files, tuple)
+        )
+
+    def __is_performance_rooted(self) -> bool:
+        return (
+            isinstance(self.performers, tuple) and
+            isinstance(self.files, FileIndexRecord)
+        )
 
     @staticmethod
     def fetch(cursor, root_record: Union[PersonIndexRecord, FileIndexRecord]) -> Optional["PerformanceIndexRecord"]:
@@ -164,11 +185,32 @@ class PerformanceIndexRecord(SQLiteDataClass):
         else:
             return PerformanceIndexRecord(files=cast(FileIndexRecord, root_record), performers=non_root_attr) # type: ignore
 
+    def add_performers(self, performers: Iterable[PersonIndexRecord]): 
+        if self.__is_performance_rooted():
+            new_list = list(cast(tuple[PersonIndexRecord, ...], self.performers))
+            new_list.extend(performers)
+            self.performers = tuple(new_list)
+        else:
+            raise InvalidDataClassState("Object must be performance rooted to add performers.")
+
+    def add_performances(self, performances: Iterable[FileIndexRecord]):
+        if self.__is_person_rooted():
+            new_list = list(cast(tuple[FileIndexRecord, ...]), self.files)
+            new_list.extend(performances)
+            self.files = tuple(new_list)
+        else:
+            raise InvalidDataClassState("Object must be performer rooted to add performances.")
+
     @staticmethod
     def from_sqlite_record(record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
 
     def insert(self, cursor, extra_args: Optional["PerformanceIndexRecord.ExtraArgs"] = None) -> Optional[int]:
+        """
+        To insert a plain one-to-one relationship between performance and
+        performer, just root the record in either field and then make a
+        singleton tuple for the other field.
+        """
         if extra_args is None:
             raise ValueError("extra_args can't be None")
 
@@ -195,4 +237,3 @@ class PerformanceIndexRecord(SQLiteDataClass):
             cursor.executemany(query, val_tuples_file)
 
         return cursor.lastrowid
-

@@ -3,7 +3,7 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import HorizontalGroup
 from textual.reactive import reactive
-from textual.screen import Screen
+from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import (
     Button, Footer, Header, Input, Label, OptionList, Static, TabbedContent,
@@ -88,7 +88,7 @@ class ErdemHomeScreen(ErdemScreen):
         - performer_count
         """
         self.shown_performers = OptionList(
-            *self.__make_options_performers(self.PERFORMERS), id="performer-list"
+            *self.__make_options_performers(self.PERFORMERS), id="performers-list"
         )
         self.shown_performers.styles.height = "30"
         self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
@@ -179,7 +179,7 @@ class ErdemHomeScreen(ErdemScreen):
                 else:
                     self.shown_performers.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
 
-                self.title_count.text = self.__make_count_label("performer", len(search_results))
+                self.performer_count.text = self.__make_count_label("performer", len(search_results))
         else:
             if self.list_tabs.active == "media-tab":
                 self.shown_titles.clear_options()
@@ -219,7 +219,7 @@ class MediaView(ErdemScreen):
             Button("x", variant="warning", id="remove-performer", flat=True)
         )
         yield OptionList(
-            *tuple(Option(str(performer)) for performer in self.performers),
+            *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers),
             id="performers-list"
         )
         yield Footer()
@@ -227,6 +227,10 @@ class MediaView(ErdemScreen):
     def on_mount(self) -> None:
         self.title = "Erdem"
         self.sub_title = f"Media Notes - {self.title}"
+
+    @on(OptionList.OptionSelected, "#performers-list")
+    async def show_performer_modal(self, event: OptionList.OptionSelected) -> None:
+        self.app.push_screen(PerformerModal(int(event.option.id)))
 
 class PerformerView(ErdemScreen):
 
@@ -268,6 +272,15 @@ class PerformerView(ErdemScreen):
     def on_mount(self) -> None:
         self.title = "Erdem"
         self.sub_title = f"Performer Notes - {self.performer}"
+
+class PerformerModal(ModalScreen):
+
+    def __init__(self, performer_id: int):
+        super().__init__()
+        self.parent_screen = PerformerView(performer_id)
+
+    def compose(self) -> ComposeResult:
+        return self.parent_screen.compose()
 
 class ErdemApp(App):
 

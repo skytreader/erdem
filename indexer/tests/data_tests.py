@@ -1,6 +1,6 @@
 from .base import SQLiteTest
 
-from ..indexerdem import FileIndexRecord
+from ..indexerdem import FileIndexRecord, NameDecisionRule, PerformanceIndexRecord, PersonIndexRecord
 
 class FileIndexRecordTests(SQLiteTest):
 
@@ -16,3 +16,64 @@ class FileIndexRecordTests(SQLiteTest):
         testfile = self.cursor.execute("SELECT id, filename, fullpath, rating, review FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert file_record == FileIndexRecord(testfile[0], testfile[1], testfile[2], testfile[3], testfile[4])
 
+class PerformanceIndexRecordTests(SQLiteTest):
+
+    def setUp(self):
+        super().setUp()
+        self.everything_everywhere = self.insert(
+            FileIndexRecord,
+            None,
+            "Everything, Everywhere, All at Once.mp4",
+            "/",
+            0,
+            ""
+        )
+        self.myeoh = self.insert(
+            PersonIndexRecord,
+            None,
+            "Michelle",
+            "Yeoh",
+            NameDecisionRule.ALMOST_CERTAIN,
+            0
+        )
+        self.jslate = self.insert(
+            PersonIndexRecord,
+            None,
+            "Jenny",
+            "Slate",
+            NameDecisionRule.ALMOST_CERTAIN,
+            0
+        )
+        self.p_and_r = self.insert(
+            FileIndexRecord,
+            None,
+            "Parks and Recreation - Bailout.mp4",
+            "/",
+            0,
+            ""
+        )
+        self.p_and_r_perf = self.insert(
+            PerformanceIndexRecord,
+            self.p_and_r,
+            tuple([self.jslate]),
+            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+        )
+        self.ee_perf = self.insert(
+            PerformanceIndexRecord,
+            self.everything_everywhere,
+            tuple([self.jslate, self.myeoh]),
+            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1, 1]))
+        )
+
+    def test_create(self):
+        assert self.p_and_r_perf.files == self.p_and_r
+        assert len(self.p_and_r_perf.performers) == 1
+        assert self.jslate in self.p_and_r_perf.performers
+    
+    def test_fetch(self):
+        # Fetch with a performer
+        jslate_perfs = PerformanceIndexRecord.fetch(self.cursor, self.jslate)
+        assert jslate_perfs.performers == self.jslate
+        assert len(jslate_perfs.files) == 2
+        assert self.everything_everywhere in jslate_perfs.files
+        assert self.p_and_r in jslate_perfs.files
