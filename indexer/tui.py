@@ -296,10 +296,12 @@ class ErdemApp(App):
         CHECK_TITLE = "Index Compatibility Check"
 
         if compatibility_check == MetadataCheckResult.COMPLETELY_COMPATIBLE:
-            self.notify("Index compatibility check passed.", title=CHECK_TITLE)
+            self.notify("Passed.", title=CHECK_TITLE)
         elif compatibility_check == MetadataCheckResult.LIKELY_COMPATIBLE:
             self.notify("Slight compatibility discrepancies detected. Reindex soon.", severity="warning", title=CHECK_TITLE)
-        elif compatibility_check == MetadataCheckResult.INDETERMINATE or compatibility_check == MetadataCheckResult.INCOMPATIBLE:
+        elif compatibility_check == MetadataCheckResult.INDETERMINATE:
+            self.notify("Unable to determine compatibility. Reindexing strongly suggested", severity="error", title=CHECK_TITLE)
+        elif compatibility_check == MetadataCheckResult.INCOMPATIBLE:
             self.notify("Compatibility not guaranteed. Reindexing strongly suggested.", severity="error", title=CHECK_TITLE)
 
     def on_mount(self) -> None:

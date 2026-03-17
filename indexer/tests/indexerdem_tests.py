@@ -1,6 +1,7 @@
 from .base import SQLiteTest
 
-from ..indexerdem import FileIndexRecord, NameDecisionRule, PersonIndexRecord
+from ..data import FileIndexRecord, PersonIndexRecord
+from ..indexerdem import MetadataCheckResult, NameDecisionRule
 
 class IndexerdemTests(SQLiteTest):
 
@@ -25,3 +26,6 @@ class IndexerdemTests(SQLiteTest):
         assert len(lionels) == 2
         assert goat in lionels
         assert vice_goat not in lionels
+
+    def test_check_compatibility(self):
+        assert self.indexerdem.check_compatibility() == MetadataCheckResult.COMPLETELY_COMPATIBLE

@@ -21,8 +21,15 @@ import logging
 import os
 import re
 import sqlite3
+import traceback
 
 NONWORD: re.Pattern = re.compile("[\W\_]+")
+
+def error_string(ex: Exception) -> str:
+    return '\n'.join([
+        ''.join(traceback.format_exception_only(None, ex)).strip(),
+        ''.join(traceback.format_exception(None, ex, ex.__traceback__)).strip()
+    ])
 
 # From https://stackoverflow.com/a/56944256/777225
 class ColoredLogFormatter(logging.Formatter):
@@ -141,16 +148,17 @@ class Indexerdem(object):
     def check_compatibility(self) -> MetadataCheckResult:
         try:
             index_version = self.fetch_index_version()
-            index_version_parse = index_version.split(".")
+            index_version_parse = index_version.val.split(".")
             indexer_version_parse = Indexerdem.INDEX_VERSION.split(".")
 
-            if index_version == Indexerdem.INDEX_VERSION:
+            if index_version.val == Indexerdem.INDEX_VERSION:
                 return MetadataCheckResult.COMPLETELY_COMPATIBLE
-            elif index_version_parse[0] == index_version_parse[0]:
+            elif index_version_parse[0] == indexer_version_parse[0]:
                 return MetadataCheckResult.LIKELY_COMPATIBLE
             else:
                 return MetadataCheckResult.INCOMPATIBLE
-        except:
+        except Exception as e:
+            print(error_string(e))
             return MetadataCheckResult.INDETERMINATE
 
     def fetch_index_version(self) -> Optional[str]:

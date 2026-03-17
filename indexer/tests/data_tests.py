@@ -1,6 +1,7 @@
 from .base import SQLiteTest
 
-from ..indexerdem import FileIndexRecord, NameDecisionRule, PerformanceIndexRecord, PersonIndexRecord
+from ..data import FileIndexRecord, MetadataRecord, PerformanceIndexRecord, PersonIndexRecord
+from ..indexerdem import NameDecisionRule
 
 class FileIndexRecordTests(SQLiteTest):
 
@@ -15,6 +16,11 @@ class FileIndexRecordTests(SQLiteTest):
         assert file_record.id == insert_id
         testfile = self.cursor.execute("SELECT id, filename, fullpath, rating, review FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert file_record == FileIndexRecord(testfile[0], testfile[1], testfile[2], testfile[3], testfile[4])
+
+class MetadataRecordTests(SQLiteTest):
+
+    def test_fetch(self):
+        assert MetadataRecord.fetch(self.cursor, "index_version") is not None
 
 class PerformanceIndexRecordTests(SQLiteTest):
 

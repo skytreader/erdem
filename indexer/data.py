@@ -60,8 +60,8 @@ class MetadataRecord(SQLiteDataClass):
 
     @staticmethod
     def fetch(cursor, id: str) -> Optional["MetadataRecord"]:
-        query = f"SELECT * FROM __metadata WHERE id={id} LIMIT 1"
-        result = cursor.execute(query).fetchone()
+        query = "SELECT * FROM __metadata WHERE key=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
         return MetadataRecord(*result) if result is not None else None
 
     @staticmethod

@@ -27,6 +27,7 @@ class SQLiteTest(unittest.TestCase):
         self.cursor.executescript(
             """
             PRAGMA foreign_keys=OFF;
+            DROP TABLE __metadata;
             DROP TABLE files;
             DROP TABLE persons;
             DROP TABLE participation;
