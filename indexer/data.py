@@ -219,21 +219,24 @@ class PerformanceIndexRecord(SQLiteDataClass):
         query = """
             INSERT INTO participation (person_id, file_id, is_certain) VALUES (?, ?, ?);
         """
-        if isinstance(self.performers, Iterable):
+        val_tuples: tuple[tuple[int, int, int], ...]
+        if self.__is_performance_rooted():
             # self.files is root
             root_val = cast(FileIndexRecord, self.files)
             if len(self.performers) != len(extra_args.certainties):
                 raise ValueError("performers and certainties are not the same length")
 
             val_tuples = ((p.id, root_val.id, c) for p, c in zip(self.performers, extra_args.certainties))
-            cursor.executemany(query, val_tuples)
-        elif isinstance(self.files, Iterable):
+        elif self.__is_person_rooted():
             # self.performers is root
-            root_file = cast(PersonIndexRecord, self.performers)
+            root_performer = cast(PersonIndexRecord, self.performers)
             if len(self.files) != len(extra_args.certainties):
                 raise ValueError("files and certainties are not the same length")
 
-            val_tuples_file = ((root_file.id, f, c) for f, c in zip(self.files, extra_args.certainties))
-            cursor.executemany(query, val_tuples_file)
+            val_tuples = ((root_performer.id, f.id, c) for f, c in zip(self.files, extra_args.certainties))
+        else:
+            raise InvalidDataClassState("Object is not rooted.")
+        
+        cursor.executemany(query, val_tuples)
 
         return cursor.lastrowid

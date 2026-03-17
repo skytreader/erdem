@@ -65,6 +65,37 @@ class PerformanceIndexRecordTests(SQLiteTest):
             insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1, 1]))
         )
 
+        self.zendaya = self.insert(
+            PersonIndexRecord,
+            None,
+            "Zendaya",
+            None,
+            NameDecisionRule.ALMOST_CERTAIN,
+            0
+        )
+        self.dune = self.insert(FileIndexRecord, None, "Dune.mp4", "/", 0, "")
+        self.dune_perf = self.insert(
+            PerformanceIndexRecord,
+            self.dune,
+            tuple([self.zendaya]),
+            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+        )
+
+        self.spiderman = self.insert(
+            FileIndexRecord,
+            None,
+            "Spiderman - Homecoming.mp4",
+            "/",
+            0,
+            ""
+        )
+        self.spiderman_perf = self.insert(
+            PerformanceIndexRecord,
+            tuple([self.spiderman]),
+            self.zendaya,
+            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+        )
+
     def test_create(self):
         assert self.p_and_r_perf.files == self.p_and_r
         assert len(self.p_and_r_perf.performers) == 1
@@ -77,3 +108,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
         assert len(jslate_perfs.files) == 2
         assert self.everything_everywhere in jslate_perfs.files
         assert self.p_and_r in jslate_perfs.files
+
+        # Fetch performer with no last name
+        zendaya_perfs = PerformanceIndexRecord.fetch(self.cursor, self.zendaya)
+        assert zendaya_perfs.performers == self.zendaya
