@@ -23,7 +23,7 @@ import re
 import sqlite3
 import traceback
 
-NONWORD: re.Pattern = re.compile("[\W\_]+")
+NONWORD: re.Pattern = re.compile(r"[\W\_]+")
 
 def error_string(ex: Exception) -> str:
     return '\n'.join([
@@ -117,7 +117,7 @@ class Indexerdem(object):
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("""CREATE TABLE IF NOT EXISTS __metadata
                           (key TEXT PRIMARY KEY NOT NULL,
-                           value TEXT NOT NULL);""")
+                           val TEXT NOT NULL);""")
         cursor.execute("""CREATE TABLE IF NOT EXISTS files
                           (id INTEGER PRIMARY KEY ASC,
                            filename TEXT UNIQUE NOT NULL,
@@ -148,20 +148,22 @@ class Indexerdem(object):
     def check_compatibility(self) -> MetadataCheckResult:
         try:
             index_version = self.fetch_index_version()
-            index_version_parse = index_version.val.split(".")
-            indexer_version_parse = Indexerdem.INDEX_VERSION.split(".")
+            if index_version is not None:
+                index_version_parse = index_version.val.split(".")
+                indexer_version_parse = Indexerdem.INDEX_VERSION.split(".")
 
-            if index_version.val == Indexerdem.INDEX_VERSION:
-                return MetadataCheckResult.COMPLETELY_COMPATIBLE
-            elif index_version_parse[0] == indexer_version_parse[0]:
-                return MetadataCheckResult.LIKELY_COMPATIBLE
+                if index_version.val == Indexerdem.INDEX_VERSION:
+                    return MetadataCheckResult.COMPLETELY_COMPATIBLE
+                elif index_version_parse[0] == indexer_version_parse[0]:
+                    return MetadataCheckResult.LIKELY_COMPATIBLE
+                else:
+                    return MetadataCheckResult.INCOMPATIBLE
             else:
-                return MetadataCheckResult.INCOMPATIBLE
+                return MetadataCheckResult.INDETERMINATE
         except Exception as e:
-            print(error_string(e))
             return MetadataCheckResult.INDETERMINATE
 
-    def fetch_index_version(self) -> Optional[str]:
+    def fetch_index_version(self) -> Optional[MetadataRecord]:
         """
         Fetch the index version of the loaded index.
         """

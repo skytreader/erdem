@@ -1,6 +1,6 @@
 from .base import SQLiteTest
 
-from ..data import FileIndexRecord, PersonIndexRecord
+from ..data import FileIndexRecord, MetadataRecord, PersonIndexRecord
 from ..indexerdem import MetadataCheckResult, NameDecisionRule
 
 class IndexerdemTests(SQLiteTest):
@@ -29,3 +29,19 @@ class IndexerdemTests(SQLiteTest):
 
     def test_check_compatibility(self):
         assert self.indexerdem.check_compatibility() == MetadataCheckResult.COMPLETELY_COMPATIBLE
+        index_version_record = MetadataRecord.fetch(self.cursor, "index_version")
+        index_version_record.val = "1.1"
+        assert index_version_record.save(self.cursor)
+        self.connection.commit()
+        assert self.indexerdem.check_compatibility() == MetadataCheckResult.LIKELY_COMPATIBLE
+        index_version_record.val = "blerp"
+        assert index_version_record.save(self.cursor)
+        self.connection.commit()
+        assert self.indexerdem.check_compatibility() == MetadataCheckResult.INCOMPATIBLE
+        index_version_record.val = ""
+        assert index_version_record.save(self.cursor)
+        self.connection.commit()
+        assert self.indexerdem.check_compatibility() == MetadataCheckResult.INCOMPATIBLE
+        assert index_version_record.delete(self.cursor)
+        self.connection.commit()
+        assert self.indexerdem.check_compatibility() == MetadataCheckResult.INDETERMINATE

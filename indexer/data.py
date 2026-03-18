@@ -16,6 +16,9 @@ NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 @dataclass
 class SQLiteDataClass(ABC):
 
+    UPDATE_QUERY = ""
+    DELETE_QUERY = ""
+
     @staticmethod
     @abstractmethod
     def fetch(cursor, id: Any) -> Optional["SQLiteDataClass"]:
@@ -52,20 +55,54 @@ class SQLiteDataClass(ABC):
         when applicable.
         """
         pass
+    
+    @abstractmethod
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        pass
+
+    @abstractmethod
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        pass
+
+    def save(self, cursor) -> bool:
+        try:
+            cursor.execute(type(self).UPDATE_QUERY, self.create_update_tuple())
+            return True
+        except:
+            return False
+
+    def delete(self, cursor) -> bool:
+        try:
+            cursor.execute(type(self).DELETE_QUERY, self.create_delete_tuple())
+            return True
+        except:
+            return False
 
 @dataclass
 class MetadataRecord(SQLiteDataClass):
     key: str
     val: str
+    UPDATE_QUERY = """
+        UPDATE __metadata
+        SET key=?,
+        val=?
+        WHERE key=?
+        LIMIT 1
+    """
+    DELETE_QUERY = """
+        DELETE FROM __metadata
+        WHERE key=?
+        LIMIT 1
+    """
 
     @staticmethod
     def fetch(cursor, id: str) -> Optional["MetadataRecord"]:
-        query = "SELECT * FROM __metadata WHERE key=? LIMIT 1"
+        query = "SELECT key, val FROM __metadata WHERE key=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
         return MetadataRecord(*result) if result is not None else None
 
     @staticmethod
-    def from_sqlite_record(record: tuple[any, ...]) -> "MetadataRecord":
+    def from_sqlite_record(record: tuple[Any, ...]) -> "MetadataRecord":
         raise ConstructorPreferred()
     
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
@@ -75,12 +112,18 @@ class MetadataRecord(SQLiteDataClass):
         """
         try:
             cursor.execute(
-                "INSERT INTO __metadata (key, value) VALUES (?, ?)",
+                "INSERT INTO __metadata (key, val) VALUES (?, ?)",
                 (self.key, self.val)
             )
             return 1
         except:
             return 0
+
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        return (self.key, self.val, self.key)
+
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        return (self.key,)
 
 @dataclass
 class FileIndexRecord(SQLiteDataClass):
@@ -110,6 +153,12 @@ class FileIndexRecord(SQLiteDataClass):
 
     def __str__(self):
         return self.filename
+
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        return tuple()
+
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        return tuple()
 
 @dataclass
 class PersonIndexRecord(SQLiteDataClass):
@@ -161,6 +210,12 @@ class PersonIndexRecord(SQLiteDataClass):
             if self.lastname is not None else
             self.firstname
         )
+
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        return tuple()
+
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        return tuple()
 
 @dataclass
 class PerformanceIndexRecord(SQLiteDataClass):
@@ -224,7 +279,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
     def add_performances(self, performances: Iterable[FileIndexRecord]):
         if self.__is_person_rooted():
-            new_list = list(cast(tuple[FileIndexRecord, ...]), self.files)
+            new_list = list(cast(tuple[FileIndexRecord, ...], self.files))
             new_list.extend(performances)
             self.files = tuple(new_list)
         else:
@@ -252,20 +307,54 @@ class PerformanceIndexRecord(SQLiteDataClass):
         if self.__is_performance_rooted():
             # self.files is root
             root_val = cast(FileIndexRecord, self.files)
+            self.performers = cast(tuple[PersonIndexRecord, ...], self.performers)
             if len(self.performers) != len(extra_args.certainties):
                 raise ValueError("performers and certainties are not the same length")
 
-            val_tuples = ((p.id, root_val.id, c) for p, c in zip(self.performers, extra_args.certainties))
+            if root_val.id is None:
+                root_val.insert(cursor)
+
+            root_val.id = cast(int, root_val.id)
+            temp_tuples = []
+
+            for p, c in zip(self.performers, extra_args.certainties):
+                if p.id is None:
+                    p.insert(cursor)
+            
+                p.id = cast(int, p.id)
+                temp_tuples.append((p.id, root_val.id, c))
+
+            val_tuples = tuple(temp_tuples)
         elif self.__is_person_rooted():
             # self.performers is root
             root_performer = cast(PersonIndexRecord, self.performers)
+            self.files = cast(tuple[FileIndexRecord, ...], self.files)
             if len(self.files) != len(extra_args.certainties):
                 raise ValueError("files and certainties are not the same length")
 
-            val_tuples = ((root_performer.id, f.id, c) for f, c in zip(self.files, extra_args.certainties))
+            if root_performer.id is None:
+                root_performer.insert(cursor)
+
+            root_performer.id = cast(int, root_performer.id)
+            temp_tuples = []
+
+            for f, c in zip(self.files, extra_args.certainties):
+                if f.id is None:
+                    f.insert(cursor)
+
+                f.id = cast(int, f.id)
+                temp_tuples.append((root_performer.id, f.id, c))
+
+            val_tuples = tuple(temp_tuples)
         else:
             raise InvalidDataClassState("Object is not rooted.")
         
         cursor.executemany(query, val_tuples)
 
         return cursor.lastrowid
+
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        return tuple()
+
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        return tuple()

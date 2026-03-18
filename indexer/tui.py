@@ -220,7 +220,7 @@ class MediaView(ErdemScreen):
             Button("x", variant="warning", id="remove-performer", flat=True)
         )
         yield OptionList(
-            *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers),
+            *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
             id="performers-list"
         )
         yield Footer()
@@ -231,7 +231,10 @@ class MediaView(ErdemScreen):
 
     @on(OptionList.OptionSelected, "#performers-list")
     async def show_performer_modal(self, event: OptionList.OptionSelected) -> None:
-        self.app.push_screen(PerformerModal(int(event.option.id)))
+        if event.option.id is not None:
+            self.app.push_screen(PerformerModal(int(event.option.id)))
+        else:
+            self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
 class PerformerView(ErdemScreen):
 

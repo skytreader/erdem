@@ -14,6 +14,10 @@ class SQLiteTest(unittest.TestCase):
     @property
     def cursor(self):
         return self.indexerdem.conn.cursor()
+    
+    @property
+    def connection(self):
+        return self.indexerdem.conn
 
     def insert(self, constructor, *args, insert_extra_args: Optional[Any]=None):
         obj = constructor(*args)

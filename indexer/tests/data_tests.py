@@ -22,6 +22,13 @@ class MetadataRecordTests(SQLiteTest):
     def test_fetch(self):
         assert MetadataRecord.fetch(self.cursor, "index_version") is not None
 
+    def test_delete(self):
+        index_version_record = MetadataRecord.fetch(self.cursor, "index_version")
+        assert index_version_record is not None
+        assert index_version_record.delete(self.cursor)
+        self.connection.commit()
+        assert MetadataRecord.fetch(self.cursor, "index_version") is None
+
 class PerformanceIndexRecordTests(SQLiteTest):
 
     def setUp(self):
