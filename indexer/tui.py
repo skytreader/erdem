@@ -232,7 +232,7 @@ class MediaView(ErdemScreen):
     @on(OptionList.OptionSelected, "#performers-list")
     async def show_performer_modal(self, event: OptionList.OptionSelected) -> None:
         if event.option.id is not None:
-            self.app.push_screen(PerformerModal(int(event.option.id)))
+            self.erdem_app.push_screen(PerformerModal(int(event.option.id)))
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
@@ -278,6 +278,14 @@ class PerformerView(ErdemScreen):
         self.sub_title = f"Performer Notes - {self.performer}"
 
 class PerformerModal(ModalScreen):
+    DEFAULT_CSS = """
+        #performances-list {
+            width: 60
+        }
+    """
+    BINDINGS = [
+        ("backspace", "close", "Close")
+    ]
 
     def __init__(self, performer_id: int):
         super().__init__()
@@ -285,6 +293,9 @@ class PerformerModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         return self.parent_screen.compose()
+
+    def action_close(self):
+        self.app.pop_screen()
 
 class ErdemApp(App):
 
@@ -308,7 +319,7 @@ class ErdemApp(App):
             self.notify("Compatibility not guaranteed. Reindexing strongly suggested.", severity="error", title=CHECK_TITLE)
 
     def on_mount(self) -> None:
-        self.push_screen("home")
+        self.app.push_screen("home")
 
 app = ErdemApp()
 if __name__ == "__main__":

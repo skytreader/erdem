@@ -8,3 +8,8 @@ Label.actionable-title {
     margin: 1 0 0 2;
     padding-right: 2;
 }
+
+PerformerModal {
+    align: center middle;
+    width: 60;
+}
