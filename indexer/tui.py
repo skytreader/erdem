@@ -209,10 +209,11 @@ class MediaView(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Label(self.record.filename if self.record is not None else "Unknown", id="record-title")
         yield HorizontalGroup(
-            Label(self.record.filename if self.record is not None else "Unknown", id="record-title"),
             Button("Save", id="save-record", flat=True),
-            Button("Delete", id="delete-record", flat=True)
+            Button("Delete", id="delete-record", flat=True),
+            classes="save-delete-button-group"
         )
         yield HorizontalGroup(
             Label("Performers:", classes="actionable-title"),

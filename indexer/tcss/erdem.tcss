@@ -1,3 +1,6 @@
+* {
+  border: solid green;
+}
 Label#record-title {
     margin: 1 0 0 2;
     text-style: bold;
@@ -12,4 +15,17 @@ Label.actionable-title {
 PerformerModal {
     align: center middle;
     width: 60;
+}
+
+MediaView {
+    layout: grid;
+    grid-size: 3;
+}
+
+#record-title {
+    column-span: 2;
+}
+
+.save-delete-button-group {
+    column-span: 1;
 }
