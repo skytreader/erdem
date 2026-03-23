@@ -12,7 +12,7 @@ Label.actionable-title {
 
 MediaView {
     layout: grid;
-    grid-size: 3 7;
+    grid-size: 3;
 }
 
 .span1 {

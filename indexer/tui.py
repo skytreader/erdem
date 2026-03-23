@@ -236,7 +236,11 @@ class MediaView(ErdemScreen):
             classes="span3"
         )
         ##############
-        yield Label("Review:", classes="span3")
+        yield HorizontalGroup(
+            Label("Review:", classes="actionable-title"),
+            Button("Edit", id="edit-review", flat=True),
+            classes="span3"
+        )
         yield Markdown(classes="span3")
         ##############
         yield Footer()
