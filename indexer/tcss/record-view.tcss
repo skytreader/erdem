@@ -1,0 +1,28 @@
+Label#record-title {
+    margin: 1 0 0 2;
+    text-style: bold;
+    padding-right: 2;
+}
+
+Label.actionable-title {
+    margin: 1 0 0 2;
+    padding-right: 2;
+}
+
+
+MediaView {
+    layout: grid;
+    grid-size: 3 7;
+}
+
+.span1 {
+    column-span: 1;
+}
+
+.span2 {
+    column-span: 2;
+}
+
+.span3 {
+    column-span: 3;
+}

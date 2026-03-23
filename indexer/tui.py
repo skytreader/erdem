@@ -6,12 +6,13 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import (
-    Button, Footer, Header, Input, Label, OptionList, Static, TabbedContent,
-    TabPane
+    Button, Footer, Header, Input, Label, Markdown, OptionList, Static,
+    TabbedContent, TabPane
 )
 from textual.widgets.option_list import Option
 from typing import Any, cast, Iterable, Optional
 
+import os
 import traceback
 
 from .data import FileIndexRecord, PerformanceIndexRecord, PersonIndexRecord
@@ -193,7 +194,7 @@ class ErdemHomeScreen(ErdemScreen):
 
 class MediaView(ErdemScreen):
 
-    CSS_PATH = "tcss/erdem.tcss"
+    CSS_PATH = "tcss/record-view.tcss"
 
     def __init__(self, id: int):
         super().__init__()
@@ -209,21 +210,35 @@ class MediaView(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Label(self.record.filename if self.record is not None else "Unknown", id="record-title")
+        ##############
+        yield Label(self.record.filename if self.record is not None else "Unknown", id="record-title", classes="span2")
         yield HorizontalGroup(
             Button("Save", id="save-record", flat=True),
             Button("Delete", id="delete-record", flat=True),
-            classes="save-delete-button-group"
+            classes="span1"
         )
+        ##############
+        yield Label("Fullpath:", classes="span1")
+        yield Input(classes="span2")
+        ##############
+        yield Label("Rating:", classes="span1")
+        yield Input(classes="span2")
+        ##############
         yield HorizontalGroup(
             Label("Performers:", classes="actionable-title"),
             Button("+", id="add-performer", flat=True),
-            Button("x", variant="warning", id="remove-performer", flat=True)
+            Button("x", variant="warning", id="remove-performer", flat=True),
+            classes="span3"
         )
         yield OptionList(
             *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
-            id="performers-list"
+            id="performers-list",
+            classes="span3"
         )
+        ##############
+        yield Label("Review:", classes="span3")
+        yield Markdown(classes="span3")
+        ##############
         yield Footer()
 
     def on_mount(self) -> None:
@@ -303,6 +318,12 @@ class ErdemApp(App):
     SCREENS = {
         "home": ErdemHomeScreen
     }
+
+    DEFAULT_CSS = """
+    * {
+        border: solid green;
+    }
+    """ if bool(os.environ.get("ERDEM_CSS_DEBUG")) else ""
 
     def __init__(self):
         super().__init__()
