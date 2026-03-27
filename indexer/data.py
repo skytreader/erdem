@@ -1,7 +1,7 @@
 from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import StrEnum
 from typing import Any, cast, Iterable, Optional, List, Set, Tuple, Union
 
@@ -78,6 +78,24 @@ class SQLiteDataClass(ABC):
         except:
             return False
 
+
+def starfields(cls) -> str:
+    """
+    Return a comma-separated string listing all the fields of this class.
+    The order output is consistent with, for example, `from_sqlite_record`.
+
+    NOTE: This assumes that the `dataclasses.fields` function returns the
+    declaration order of the fields. The closest guarantee we have is the
+    following claim in the docs:
+
+    > The order of the fields in all of the generated methods is the order
+    > in which they appear in the class definition.
+
+    But the thing is, `fields` is not a generated method!
+    """
+    return ",".join([f.name for f in fields(cls)])
+
+
 @dataclass
 class MetadataRecord(SQLiteDataClass):
     key: str
@@ -135,8 +153,8 @@ class FileIndexRecord(SQLiteDataClass):
 
     @staticmethod
     def fetch(cursor, id) -> Optional["FileIndexRecord"]:
-        query = f"SELECT id, filename, fullpath, review, rating FROM files WHERE id={id} LIMIT 1"
-        result = cursor.execute(query).fetchone()
+        query = f"SELECT {starfields(FileIndexRecord)} FROM files WHERE id=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
         return FileIndexRecord(*result) if result is not None else None
 
     @staticmethod
@@ -166,12 +184,12 @@ class PersonIndexRecord(SQLiteDataClass):
     firstname: str
     lastname: Optional[str]
     extraction_rule: NameDecisionRule
-    is_deactivated: int
+    is_deactivated: int = 0
 
     @staticmethod
     def fetch(cursor, id) -> Optional["PersonIndexRecord"]:
-        query = f"SELECT * FROM persons WHERE id={id} LIMIT 1"
-        result = cursor.execute(query).fetchone()
+        query = f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE id=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
         return PersonIndexRecord.from_sqlite_record(result) if result is not None else None
 
     @staticmethod
@@ -191,9 +209,13 @@ class PersonIndexRecord(SQLiteDataClass):
     def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:
         test = None
         if lastname is not None:
-            test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname=? LIMIT 1;", (firstname, lastname)).fetchone()
+            test = cursor.execute(
+                f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE firstname=? AND lastname=? LIMIT 1;",
+                (firstname, lastname)
+            ).fetchone()
         else:
-            test = cursor.execute("SELECT * FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
+            test = cursor.execute(
+                f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
 
         if test:
             return PersonIndexRecord.from_sqlite_record(test)

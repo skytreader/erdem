@@ -29,6 +29,50 @@ class FileIndexRecordTests(SQLiteTest):
         fetch_is_fine = FileIndexRecord.fetch(self.cursor, fine.id)
         assert fine == fetch_is_fine
 
+class PersonIndexRecordTests(SQLiteTest):
+
+    def test_fetch(self):
+        scarjo = PersonIndexRecord(
+            None,
+            "Scarlett",
+            "Johansson",
+            NameDecisionRule.ALMOST_CERTAIN,
+        )
+        scarjo.insert(self.cursor)
+        fetch_scarjo = PersonIndexRecord.fetch(self.cursor, scarjo.id)
+        assert scarjo == fetch_scarjo
+
+    def test_find_by_name(self):
+        scarjo = PersonIndexRecord(
+            None,
+            "Scarlett",
+            "Johansson",
+            NameDecisionRule.ALMOST_CERTAIN,
+        )
+        scarjo.insert(self.cursor)
+        zendaya = PersonIndexRecord(
+            None,
+            "Zendaya",
+            None,
+            NameDecisionRule.MANUAL_INPUT
+        )
+        zendaya.insert(self.cursor)
+        assert PersonIndexRecord.find_by_name(
+            self.cursor,
+            "Scarlett",
+            "Johansson"
+        ) == scarjo
+        assert PersonIndexRecord.find_by_name(
+            self.cursor,
+            "Zendaya",
+            None
+        ) == zendaya
+        assert PersonIndexRecord.find_by_name(
+            self.cursor,
+            "Scarlett",
+            None
+        ) is None
+
 class MetadataRecordTests(SQLiteTest):
 
     def test_fetch(self):
