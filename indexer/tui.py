@@ -219,10 +219,10 @@ class MediaView(ErdemScreen):
         )
         ##############
         yield Label("Fullpath:", classes="span1")
-        yield Input(classes="span2")
+        yield Input(classes="span2", value=self.record.fullpath)
         ##############
         yield Label("Rating:", classes="span1")
-        yield Input(classes="span2")
+        yield Input(classes="span2", type="integer")
         ##############
         yield HorizontalGroup(
             Label("Performers:", classes="actionable-title"),

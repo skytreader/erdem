@@ -8,9 +8,9 @@ class IndexerdemTests(SQLiteTest):
     def test_search_files(self):
         messi_files = self.indexerdem.search_files("messi")
         assert len(messi_files) == 0
-        messi_record = FileIndexRecord(None, "Best Goals Messi 2017.mp4", "/", 0, "")
+        messi_record = FileIndexRecord(None, "Best Goals Messi 2017.mp4", "/", "", 10)
         messi_record.insert(self.cursor)
-        ronaldo_record = FileIndexRecord(None, "Best Goals CR7 2017.mp4", "/", 0, "If not for Messi, would've been the best.")
+        ronaldo_record = FileIndexRecord(None, "Best Goals CR7 2017.mp4", "/", "If not for Messi, would've been the best.")
         ronaldo_record.insert(self.cursor)
         messi_files = self.indexerdem.search_files("messi")
         assert len(messi_files) == 1

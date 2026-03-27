@@ -351,7 +351,7 @@ class Indexerdem(object):
     
     def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
-        query = f"SELECT * FROM files WHERE filename LIKE '%{searchterm}%'"
+        query = f"SELECT id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
 
     def search_performers(self, searchterm: str) -> Union[tuple[PersonIndexRecord, ...], tuple]:

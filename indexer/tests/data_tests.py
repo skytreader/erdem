@@ -8,14 +8,26 @@ class FileIndexRecordTests(SQLiteTest):
     def test_insert(self):
         testfile = self.cursor.execute("SELECT * FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert testfile is None
-        file_record = FileIndexRecord(None, "test", "/", 0, "")
+        file_record = FileIndexRecord(None, "test", "/", "", 0)
         assert file_record.id is None
         insert_id = file_record.insert(self.cursor)
         assert file_record is not None
         assert insert_id is not None
         assert file_record.id == insert_id
-        testfile = self.cursor.execute("SELECT id, filename, fullpath, rating, review FROM files WHERE filename='test' LIMIT 1;").fetchone()
+        testfile = self.cursor.execute("SELECT id, filename, fullpath, review, rating FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert file_record == FileIndexRecord(testfile[0], testfile[1], testfile[2], testfile[3], testfile[4])
+
+    def test_fetch(self):
+        fine = FileIndexRecord(
+            None,
+            "This Is Fine.mp4",
+            "/var/srv/videos",
+            "It's fine",
+            5
+        )
+        fine.insert(self.cursor)
+        fetch_is_fine = FileIndexRecord.fetch(self.cursor, fine.id)
+        assert fine == fetch_is_fine
 
 class MetadataRecordTests(SQLiteTest):
 
@@ -38,8 +50,8 @@ class PerformanceIndexRecordTests(SQLiteTest):
             None,
             "Everything, Everywhere, All at Once.mp4",
             "/",
-            0,
-            ""
+            "",
+            0
         )
         self.myeoh = self.insert(
             PersonIndexRecord,
@@ -62,8 +74,8 @@ class PerformanceIndexRecordTests(SQLiteTest):
             None,
             "Parks and Recreation - Bailout.mp4",
             "/",
-            0,
-            ""
+            "",
+            0
         )
         self.p_and_r_perf = self.insert(
             PerformanceIndexRecord,
@@ -86,7 +98,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             NameDecisionRule.ALMOST_CERTAIN,
             0
         )
-        self.dune = self.insert(FileIndexRecord, None, "Dune.mp4", "/", 0, "")
+        self.dune = self.insert(FileIndexRecord, None, "Dune.mp4", "/", "", 0)
         self.dune_perf = self.insert(
             PerformanceIndexRecord,
             self.dune,
@@ -99,8 +111,8 @@ class PerformanceIndexRecordTests(SQLiteTest):
             None,
             "Spiderman - Homecoming.mp4",
             "/",
-            0,
-            ""
+            "",
+            0
         )
         self.spiderman_perf = self.insert(
             PerformanceIndexRecord,

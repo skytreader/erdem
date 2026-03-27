@@ -130,12 +130,12 @@ class FileIndexRecord(SQLiteDataClass):
     id: Optional[int]
     filename: str
     fullpath: str
-    rating: int
-    review: str
+    review: Optional[str]
+    rating: int = 0
 
     @staticmethod
     def fetch(cursor, id) -> Optional["FileIndexRecord"]:
-        query = f"SELECT * FROM files WHERE id={id} LIMIT 1"
+        query = f"SELECT id, filename, fullpath, review, rating FROM files WHERE id={id} LIMIT 1"
         result = cursor.execute(query).fetchone()
         return FileIndexRecord(*result) if result is not None else None
 
@@ -145,8 +145,8 @@ class FileIndexRecord(SQLiteDataClass):
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
-            "INSERT INTO files (filename, fullpath, rating, review) VALUES (?, ?, ?, ?)",
-            (self.filename, self.fullpath, self.rating, self.review)
+            "INSERT INTO files (filename, fullpath, review, rating) VALUES (?, ?, ?, ?)",
+            (self.filename, self.fullpath, self.review, self.rating)
         )
         self.id = cursor.lastrowid
         return self.id
