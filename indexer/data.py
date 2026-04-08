@@ -151,6 +151,13 @@ class FileIndexRecord(SQLiteDataClass):
     review: Optional[str]
     rating: int = 0
 
+    def __post_init__(self):
+        if self.rating is None:
+            self.rating = 0
+
+        if self.rating < 0 or self.rating > 10:
+            raise InvalidDataClassState(f"Rating should be between 0 and 10. Given: {self.rating}")
+
     @staticmethod
     def fetch(cursor, id) -> Optional["FileIndexRecord"]:
         query = f"SELECT {starfields(FileIndexRecord)} FROM files WHERE id=? LIMIT 1"

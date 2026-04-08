@@ -208,6 +208,9 @@ class MediaView(ErdemScreen):
             )
             self.performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
 
+    def __update_object(self):
+        self.record.rating = int(self.query_one("#rating-input").value)
+
     def compose(self) -> ComposeResult:
         yield Header()
         ##############
@@ -219,10 +222,15 @@ class MediaView(ErdemScreen):
         )
         ##############
         yield Label("Fullpath:", classes="span1")
-        yield Input(classes="span2", value=self.record.fullpath)
+        yield Label(self.record.fullpath, classes="span2")
         ##############
         yield Label("Rating:", classes="span1")
-        yield Input(classes="span2", type="integer")
+        yield Input(
+            classes="span2",
+            type="integer",
+            value=str(self.record.rating),
+            id="rating-input"
+        )
         ##############
         yield HorizontalGroup(
             Label("Performers:", classes="actionable-title"),
