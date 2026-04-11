@@ -1,7 +1,7 @@
 from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Grid, HorizontalGroup
+from textual.containers import CenterMiddle, Grid, HorizontalGroup
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
@@ -314,11 +314,7 @@ class PerformerView(ErdemScreen):
         self.sub_title = f"Performer Notes - {self.performer}"
 
 class PerformerModal(ModalScreen):
-    DEFAULT_CSS = """
-        #performances-list {
-            width: 60
-        }
-    """
+    CSS_PATH = "tcss/record-view.tcss"
     BINDINGS = [
         ("backspace", "close", "Close")
     ]
@@ -328,10 +324,11 @@ class PerformerModal(ModalScreen):
         self.parent_screen = PerformerView(performer_id, True)
 
     def compose(self) -> ComposeResult:
-        yield from performer_record_form(
-            self.parent_screen.performer,
-            self.parent_screen.erdem_app.cursor
-        )
+        with CenterMiddle(id="modal-container"):
+            yield from performer_record_form(
+                self.parent_screen.performer,
+                self.parent_screen.erdem_app.cursor
+            )
 
     def action_close(self):
         self.app.pop_screen()

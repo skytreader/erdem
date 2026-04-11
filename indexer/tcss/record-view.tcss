@@ -17,13 +17,18 @@ MediaView, PerformerView {
 }
 
 PerformerModal {
-    /*layout: grid;
-    grid-size: 3;
-    grid-gutter: 1 2;*/
     align: center middle;
+}
+
+#modal-container {
+    layout: grid;
+    grid-size: 3;
+    grid-gutter: 1 2;
+    grid-rows: 1fr 3;
     width: 60;
     content-align: center middle;
     border: thick $background 80%;
+    background: $surface;
 }
 
 .span1 {
