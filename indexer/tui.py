@@ -1,7 +1,7 @@
 from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import HorizontalGroup
+from textual.containers import Grid, HorizontalGroup
 from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
@@ -264,42 +264,50 @@ class MediaView(ErdemScreen):
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
-class PerformerView(ErdemScreen):
+def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
+    yield Label(f"{record}", id="record-title", classes="span3")
+    ###############################################
+    yield Label("First name:", classes="span1")
+    yield Input(classes="span2", value=f"{record.firstname}")
+    ###############################################
+    yield OptionList(
+        *tuple(Option(str(_file)) for _file in record.load_performances(cursor)),
+        id="performances-list"
+    )
 
-    def __init__(self, performer_id: int):
+class PerformerView(ErdemScreen):
+    CSS_PATH = "tcss/record-view.tcss"
+
+    def __init__(self, performer_id: int, is_modal_view: bool = False):
         super().__init__()
         self.performer = PersonIndexRecord.fetch(
             self.erdem_app.index.conn.cursor(), performer_id
         )
+        self.is_modal_view = is_modal_view
         self.error_str: Optional[str] = None
 
         if self.performer is not None:
             try:
-                performances = PerformanceIndexRecord.fetch(
-                    self.erdem_app.index.conn.cursor(),
-                    self.performer
-                )
-                self.performances = cast(tuple[Optional[FileIndexRecord], ...], performances.files if performances is not None else tuple())
+                self.performances = self.performer.load_performances(self.erdem_app.cursor)
             except OperationalError as e:
                 self.error_str = error_string(e)
         else:
             self.error_str = "Performer not found"
 
     def compose(self) -> ComposeResult:
-        yield Header()
-        yield Static(f"{self.performer}")
+        if not self.is_modal_view:
+            yield Header()
+
         if self.error_str is None:
-            yield OptionList(
-                *tuple(Option(str(_file)) for _file in self.performances),
-                id="performances-list"
-            )
+            yield from performer_record_form(self.performer, self.erdem_app.cursor)
         else:
             error = Static(f"Error: {self.error_str}")
             error.styles.background = "red"
             error.styles.color = "white"
             error.styles.padding = (1, 2)
             yield error
-        yield Footer()
+        if not self.is_modal_view:
+            yield Footer()
 
     def on_mount(self) -> None:
         self.title = "Erdem"
@@ -317,10 +325,13 @@ class PerformerModal(ModalScreen):
 
     def __init__(self, performer_id: int):
         super().__init__()
-        self.parent_screen = PerformerView(performer_id)
+        self.parent_screen = PerformerView(performer_id, True)
 
     def compose(self) -> ComposeResult:
-        return self.parent_screen.compose()
+        yield from performer_record_form(
+            self.parent_screen.performer,
+            self.parent_screen.erdem_app.cursor
+        )
 
     def action_close(self):
         self.app.pop_screen()
@@ -351,6 +362,10 @@ class ErdemApp(App):
             self.notify("Unable to determine compatibility. Reindexing strongly suggested", severity="error", title=CHECK_TITLE)
         elif compatibility_check == MetadataCheckResult.INCOMPATIBLE:
             self.notify("Compatibility not guaranteed. Reindexing strongly suggested.", severity="error", title=CHECK_TITLE)
+
+    @property
+    def cursor(self):
+        return self.index.conn.cursor()
 
     def on_mount(self) -> None:
         self.app.push_screen("home")

@@ -10,9 +10,20 @@ Label.actionable-title {
 }
 
 
-MediaView {
+MediaView, PerformerView {
     layout: grid;
     grid-size: 3;
+    background: $surface;
+}
+
+PerformerModal {
+    /*layout: grid;
+    grid-size: 3;
+    grid-gutter: 1 2;*/
+    align: center middle;
+    width: 60;
+    content-align: center middle;
+    border: thick $background 80%;
 }
 
 .span1 {

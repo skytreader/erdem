@@ -212,6 +212,10 @@ class PersonIndexRecord(SQLiteDataClass):
         self.id = cursor.lastrowid
         return self.id
 
+    def load_performances(self, cursor) -> Optional[tuple[FileIndexRecord, ...]]:
+        _perfs = PerformanceIndexRecord.fetch(cursor, self)
+        return _perfs.files
+
     @staticmethod
     def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:
         test = None
