@@ -54,6 +54,9 @@ class ErdemScreen(Screen):
 class ErdemHomeScreen(ErdemScreen):
     TITLE = "Erdem"
     SUB_TITLE = "Media Notes"
+
+    BINDINGS=[("shift+tab", "switch_tab", "Switch tabs")]
+
     NO_RESULTS_FOUND = Option("No results found.", disabled=True)
 
     def __init__(self):
@@ -158,6 +161,12 @@ class ErdemHomeScreen(ErdemScreen):
     async def tab_switched(self, event: Input.Changed) -> None:
         search_input: Input = cast(Input, self.query_one("#search-box"))
         self.search_worker(search_input.value)
+
+    def action_switch_tab(self) -> None:
+        if self.list_tabs.active == "media-tab":
+            self.query_one("#list-tabs").active = "performers-tab"
+        elif self.list_tabs.active == "performers-tab":
+            self.query_one("#list-tabs").active = "media-tab"
 
     def search_worker(self, query: str) -> None:
         is_search_worthy = len(query) >= 3
@@ -270,9 +279,16 @@ def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
     yield Label("First name:", classes="span1")
     yield Input(classes="span2", value=f"{record.firstname}")
     ###############################################
+    yield HorizontalGroup(
+        Label("Performances:", classes="actionable-title"),
+        Button("+", id="add-performance", flat=True),
+        Button("x", variant="warning", id="remove-performance", flat=True),
+        classes="span3"
+    )
     yield OptionList(
         *tuple(Option(str(_file)) for _file in record.load_performances(cursor)),
-        id="performances-list"
+        id="performances-list",
+        classes="span3"
     )
 
 class PerformerView(ErdemScreen):
