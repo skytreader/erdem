@@ -56,6 +56,7 @@ class ErdemHomeScreen(ErdemScreen):
     SUB_TITLE = "Media Notes"
 
     BINDINGS=[("shift+tab", "switch_tab", "Switch tabs")]
+    CSS_PATH = "tcss/erdem.tcss"
 
     NO_RESULTS_FOUND = Option("No results found.", disabled=True)
 
@@ -79,10 +80,6 @@ class ErdemHomeScreen(ErdemScreen):
         self.shown_titles = OptionList(
             *self.__make_options_titles(self.TITLES), id="media-list"
         )
-        # No idea what this unit is supposed to be. Could be "cells" which in
-        # the context of an OptionList I guess would be "list items" but don't
-        # quote me on that. Still, achieves what I want for now.
-        self.shown_titles.styles.height = "30"
         self.title_count.text = self.__make_count_label("title", len(self.TITLES))
 
     def __reset_performer_list(self):
