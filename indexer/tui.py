@@ -2,11 +2,10 @@ from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import CenterMiddle, Grid, HorizontalGroup
-from textual.reactive import reactive
 from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import (
-    Button, Footer, Header, Input, Label, Markdown, OptionList, Static,
+    Button, Footer, Header, Label, Markdown, OptionList, Static,
     TabbedContent, TabPane
 )
 from textual.widgets.option_list import Option
@@ -15,6 +14,7 @@ from typing import Any, cast, Iterable, Optional
 import os
 import traceback
 
+from .custom import Dynamic, GoodInput
 from .data import FileIndexRecord, PerformanceIndexRecord, PersonIndexRecord
 from .indexerdem import Indexerdem, MetadataCheckResult
 from .errors import InvalidDataClassState
@@ -27,22 +27,6 @@ def error_string(ex: Exception) -> str:
         ''.join(traceback.format_exception_only(None, ex)).strip(),
         ''.join(traceback.format_exception(None, ex, ex.__traceback__)).strip()
     ])
-
-class Dynamic(Widget):
-    """
-    In contract to `Static`, this label is dynamic.
-    """
-    DEFAULT_CSS = """
-    Dynamic {
-        height: auto;
-        width: auto;
-    }
-    """
-    
-    text: reactive[str] = reactive("text")
-
-    def render(self) -> str:
-        return self.text
 
 class ErdemScreen(Screen):
     BINDINGS = [("backspace", "app.pop_screen", "Back")]
@@ -130,7 +114,7 @@ class ErdemHomeScreen(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Input(placeholder="Search by title, tag, or performer", id="search-box")
+        yield GoodInput(placeholder="Search by title, tag, or performer", id="search-box")
         with self.list_tabs:
             with TabPane("Media", id="media-tab"):
                 yield self.title_count
@@ -150,13 +134,13 @@ class ErdemHomeScreen(ErdemScreen):
         if event.option.id is not None:
             self.app.push_screen(MediaView(int(event.option.id)))
 
-    @on(Input.Changed, "#search-box")
-    async def search(self, event: Input.Changed) -> None:
+    @on(GoodInput.Changed, "#search-box")
+    async def search(self, event: GoodInput.Changed) -> None:
         self.search_worker(event.input.value)
 
     @on(TabbedContent.TabActivated, "#list-tabs")
-    async def tab_switched(self, event: Input.Changed) -> None:
-        search_input: Input = cast(Input, self.query_one("#search-box"))
+    async def tab_switched(self, event: GoodInput.Changed) -> None:
+        search_input: GoodInput = cast(GoodInput, self.query_one("#search-box"))
         self.search_worker(search_input.value)
 
     def action_switch_tab(self) -> None:
@@ -231,7 +215,7 @@ class MediaView(ErdemScreen):
         yield Label(self.record.fullpath, classes="span2")
         ##############
         yield Label("Rating:", classes="span1")
-        yield Input(
+        yield GoodInput(
             classes="span2",
             type="integer",
             value=str(self.record.rating),
@@ -274,7 +258,7 @@ def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
     yield Label(f"{record}", id="record-title", classes="span3")
     ###############################################
     yield Label("First name:", classes="span1")
-    yield Input(classes="span2", value=f"{record.firstname}")
+    yield GoodInput(classes="span2", value=f"{record.firstname}")
     ###############################################
     yield HorizontalGroup(
         Label("Performances:", classes="actionable-title"),
