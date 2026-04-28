@@ -39,7 +39,11 @@ class ErdemHomeScreen(ErdemScreen):
     TITLE = "Erdem"
     SUB_TITLE = "Media Notes"
 
-    BINDINGS=[("shift+tab", "switch_tab", "Switch tabs")]
+    BINDINGS=[
+        ("shift+tab", "switch_tab", "Switch tabs"),
+        # Prevent popping screen when in the home screen.
+        ("backspace", "")
+    ]
     CSS_PATH = "tcss/erdem.tcss"
 
     NO_RESULTS_FOUND = Option("No results found.", disabled=True)
