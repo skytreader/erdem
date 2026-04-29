@@ -263,12 +263,14 @@ def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
     ###############################################
     yield Label("First name:", classes="span1")
     yield GoodInput(classes="span2", value=f"{record.firstname}")
+    yield Label("Last name:", classes="span1")
+    yield GoodInput(classes="span2", value=f"{record.lastname if record.lastname else ""}")
     ###############################################
+    yield Label("Performances:", classes="actionable-title span2")
     yield HorizontalGroup(
-        Label("Performances:", classes="actionable-title"),
-        Button("+", id="add-performance", flat=True),
-        Button("x", variant="warning", id="remove-performance", flat=True),
-        classes="span3"
+        Button("+", id="add-performance", flat=True, classes="list-action"),
+        Button("x", variant="warning", id="remove-performance", flat=True, classes="list-action"),
+        classes="span1 list-action"
     )
     yield OptionList(
         *tuple(Option(str(_file)) for _file in record.load_performances(cursor)),

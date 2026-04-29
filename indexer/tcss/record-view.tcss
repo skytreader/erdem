@@ -13,6 +13,7 @@ Label.actionable-title {
 MediaView, PerformerView {
     layout: grid;
     grid-size: 3;
+    grid-rows: auto;
     background: $surface;
 }
 
@@ -26,10 +27,11 @@ PerformerModal {
     grid-gutter: 1 2;
     grid-rows: auto;
     width: 80;
-    max-height: 20;
+    max-height: 40;
     content-align: center middle;
     border: thick $background 80%;
     background: $surface;
+    padding: 3;
 }
 
 #performances-list {
@@ -46,4 +48,12 @@ PerformerModal {
 
 .span3 {
     column-span: 3;
+}
+
+Button.list-action {
+    min-width: 4;
+}
+
+HorizontalGroup.list-action {
+    content-align-horizontal: right;
 }
