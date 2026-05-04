@@ -9,6 +9,7 @@ Assumptions:
 - Names are weird, the filenames even weirder/less standard.
 """
 from .data import FileIndexRecord, MetadataRecord, NameDecisionRule, NameTuple, PerformanceIndexRecord, PersonIndexRecord
+from .errors import MountpointMisMatch, MountpointUnderivable
 
 from argparse import ArgumentParser
 from collections import OrderedDict
@@ -73,6 +74,8 @@ class Indexerdem(object):
 
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
     DEFAULT_LOCALES = ("en", "en_GB", "en_US", "en_NZ")
+    # I can't be arsed about edge cases at the moment haha
+    MOUNTPOINT_RE = re.compile(r"(/media/[A-Za-z0-9]+)/.+")
 
     # The version of the index produced. This will be saved in the DB as
     # metadata. The major version should guarantee compatibility with similar
@@ -80,16 +83,23 @@ class Indexerdem(object):
     # might produce inconsistencies when presenting the data; this usually means
     # the code handling the data has changed assumptions somewhat. Schema
     # changes are _always_ major version bumps.
-    INDEX_VERSION = "1.0"
+    INDEX_VERSION = "2.0"
     # The current version of this indexer. Follows semver. Major versions of
     # indexer should be able to continously work with similar major versions of
     # the index.
-    INDEXER_VERSION = "1.0.0"
+    INDEXER_VERSION = "2.0.0"
 
-    def __init__(self, index_filename: str, locales: Optional[Iterable[str]] = None, extensions: Optional[Iterable[str]] = None):
+    def __init__(
+        self,
+        index_filename: str,
+        locales: Optional[Iterable[str]] = None,
+        extensions: Optional[Iterable[str]] = None,
+        mountpoint: Optional[str] = None
+    ):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
+        self.mountpoint = mountpoint
         self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
         if locales is None:
             runtime_locale = pylocale.getlocale()
@@ -118,12 +128,27 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS __metadata
                           (key TEXT PRIMARY KEY NOT NULL,
                            val TEXT NOT NULL);""")
-        cursor.execute("""CREATE TABLE IF NOT EXISTS files
-                          (id INTEGER PRIMARY KEY ASC,
-                           filename TEXT UNIQUE NOT NULL,
-                           fullpath TEXT NOT NULL,
-                           rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
-                           review TEXT);""")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS mountpoints (
+                id INTEGER PRIMARY KEY ASC,
+                path TEXT UNIQUE NOT NULL
+            );
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY ASC,
+                mountpoint_id INTEGER,
+                filename TEXT UNIQUE NOT NULL,
+                fullpath TEXT NOT NULL,
+                rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
+                review TEXT,
+                FOREIGN KEY(mountpoint_id) REFERENCES mountpoints(id)
+            );
+            """
+        )
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
@@ -251,6 +276,9 @@ class Indexerdem(object):
 
             return absolute_path
 
+        if self.mountpoint and not fullpath.startswith(self.mountpoint):
+            raise MountpointMisMatch(fullpath, self.mountpoint)
+
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1
@@ -351,7 +379,7 @@ class Indexerdem(object):
     
     def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
-        query = f"SELECT id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
+        query = f"SELECT id, mountpoint_id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
 
     def search_performers(self, searchterm: str) -> Union[tuple[PersonIndexRecord, ...], tuple]:
@@ -374,7 +402,15 @@ if __name__ == "__main__":
         # TODO Ensure overwrite guarantee is true!
         help="filepath to output file. An existing file will be appended to."
     )
+    parser.add_argument(
+        "--mountpoint", "-m", type=str, required=False,
+        help="mountpoint of the drive"
+    )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), Indexerdem.DEFAULT_EXTENSIONS)
+    indexer: Indexerdem = Indexerdem(
+        args["output"],
+        args["locales"].split(","),
+        Indexerdem.DEFAULT_EXTENSIONS
+    )
     indexer.init()
     indexer.readdir(args["filepath"])

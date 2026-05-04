@@ -8,9 +8,9 @@ class IndexerdemTests(SQLiteTest):
     def test_search_files(self):
         messi_files = self.indexerdem.search_files("messi")
         assert len(messi_files) == 0
-        messi_record = FileIndexRecord(None, "Best Goals Messi 2017.mp4", "/", "", 10)
+        messi_record = FileIndexRecord(None, self.default_mountpoint, "Best Goals Messi 2017.mp4", "/", "", 10)
         messi_record.insert(self.cursor)
-        ronaldo_record = FileIndexRecord(None, "Best Goals CR7 2017.mp4", "/", "If not for Messi, would've been the best.")
+        ronaldo_record = FileIndexRecord(None, self.default_mountpoint, "Best Goals CR7 2017.mp4", "/", "If not for Messi, would've been the best.")
         ronaldo_record.insert(self.cursor)
         messi_files = self.indexerdem.search_files("messi")
         assert len(messi_files) == 1
@@ -30,7 +30,7 @@ class IndexerdemTests(SQLiteTest):
     def test_check_compatibility(self):
         assert self.indexerdem.check_compatibility() == MetadataCheckResult.COMPLETELY_COMPATIBLE
         index_version_record = MetadataRecord.fetch(self.cursor, "index_version")
-        index_version_record.val = "1.1"
+        index_version_record.val = "2.1"
         assert index_version_record.save(self.cursor)
         self.connection.commit()
         assert self.indexerdem.check_compatibility() == MetadataCheckResult.LIKELY_COMPATIBLE

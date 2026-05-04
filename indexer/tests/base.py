@@ -2,6 +2,7 @@ import unittest
 import uuid
 
 from ..indexerdem import Indexerdem
+from ..data import MountpointRecord
 
 from typing import Any, Optional
 
@@ -26,12 +27,14 @@ class SQLiteTest(unittest.TestCase):
 
     def setUp(self):
         self.indexerdem.init()
+        self.default_mountpoint = MountpointRecord(None, "/media/default").insert(self.cursor)
 
     def tearDown(self):
         self.cursor.executescript(
             """
             PRAGMA foreign_keys=OFF;
             DROP TABLE __metadata;
+            DROP TABLE mountpoints;
             DROP TABLE files;
             DROP TABLE persons;
             DROP TABLE participation;

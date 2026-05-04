@@ -1,25 +1,41 @@
+from dataclasses import dataclass
+
 from .base import SQLiteTest
 
-from ..data import FileIndexRecord, MetadataRecord, PerformanceIndexRecord, PersonIndexRecord
+from ..data import (
+    FileIndexRecord, MetadataRecord, PerformanceIndexRecord, PersonIndexRecord,
+    starfields
+)
 from ..indexerdem import NameDecisionRule
+
+@dataclass
+class TestDataClass:
+    id: int
+    firstname: str
+    lastname: str
+
+def test_starfields():
+    assert starfields(TestDataClass) == "id,firstname,lastname"
+    assert starfields(TestDataClass, True) == "firstname,lastname"
 
 class FileIndexRecordTests(SQLiteTest):
 
     def test_insert(self):
         testfile = self.cursor.execute("SELECT * FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert testfile is None
-        file_record = FileIndexRecord(None, "test", "/", "", 0)
+        file_record = FileIndexRecord(None, self.default_mountpoint, "test", "/", "", 0)
         assert file_record.id is None
         insert_id = file_record.insert(self.cursor)
         assert file_record is not None
         assert insert_id is not None
         assert file_record.id == insert_id
         testfile = self.cursor.execute("SELECT id, filename, fullpath, review, rating FROM files WHERE filename='test' LIMIT 1;").fetchone()
-        assert file_record == FileIndexRecord(testfile[0], testfile[1], testfile[2], testfile[3], testfile[4])
+        assert file_record == FileIndexRecord(testfile[0], self.default_mountpoint, testfile[1], testfile[2], testfile[3], testfile[4])
 
     def test_fetch(self):
         fine = FileIndexRecord(
             None,
+            self.default_mountpoint,
             "This Is Fine.mp4",
             "/var/srv/videos",
             "It's fine",
@@ -91,6 +107,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
         super().setUp()
         self.everything_everywhere = self.insert(
             FileIndexRecord,
+            self.default_mountpoint,
             None,
             "Everything, Everywhere, All at Once.mp4",
             "/",
@@ -115,6 +132,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
         )
         self.p_and_r = self.insert(
             FileIndexRecord,
+            self.default_mountpoint,
             None,
             "Parks and Recreation - Bailout.mp4",
             "/",
@@ -142,7 +160,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             NameDecisionRule.ALMOST_CERTAIN,
             0
         )
-        self.dune = self.insert(FileIndexRecord, None, "Dune.mp4", "/", "", 0)
+        self.dune = self.insert(FileIndexRecord, None, self.default_mountpoint, "Dune.mp4", "/", "", 0)
         self.dune_perf = self.insert(
             PerformanceIndexRecord,
             self.dune,
@@ -153,6 +171,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
         self.spiderman = self.insert(
             FileIndexRecord,
             None,
+            self.default_mountpoint,
             "Spiderman - Homecoming.mp4",
             "/",
             "",

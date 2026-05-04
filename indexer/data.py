@@ -79,7 +79,7 @@ class SQLiteDataClass(ABC):
             return False
 
 
-def starfields(cls) -> str:
+def starfields(cls, noid: bool = False) -> str:
     """
     Return a comma-separated string listing all the fields of this class.
     The order output is consistent with, for example, `from_sqlite_record`.
@@ -93,7 +93,10 @@ def starfields(cls) -> str:
 
     But the thing is, `fields` is not a generated method!
     """
-    return ",".join([f.name for f in fields(cls)])
+    if noid:
+        return ",".join([f.name for f in fields(cls) if f.name != "id"])
+    else:
+        return ",".join([f.name for f in fields(cls)])
 
 
 @dataclass
@@ -144,8 +147,49 @@ class MetadataRecord(SQLiteDataClass):
         return (self.key,)
 
 @dataclass
+class MountpointRecord(SQLiteDataClass):
+    id: Optional[int]
+    path: str
+    UPDATE_QUERY = """
+        UPDATE mountpoints
+        SET path=?
+        WHERE id=?
+        LIMIT 1;
+    """
+    DELETE_QUERY = """
+        DELETE FROM mountpoints
+        WHERE id=?
+        LIMIT 1;
+    """
+
+    @staticmethod
+    def fetch(cursor, id: str) -> Optional["MountpointRecord"]:
+        query = f"SELECT {starfields(MountpointRecord)} FROM MountpointRecord WHERE id=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
+        return MountpointRecord(*result) if result is not None else None
+    
+    @staticmethod
+    def from_sqlite_record(record: tuple[Any, ...]) -> "MountpointRecord":
+        raise ConstructorPreferred()
+
+    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+        cursor.execute(
+            f"INSERT INTO mountpoints ({starfields(MountpointRecord, True)}) VALUES (?)",
+            (self.path,)
+        )
+        self.id = cursor.lastrowid
+        return self.id
+    
+    def create_update_tuple(self) -> tuple[Any, ...]:
+        return (self.path, self.id)
+
+    def create_delete_tuple(self) -> tuple[Any, ...]:
+        return (self.id,)
+
+@dataclass
 class FileIndexRecord(SQLiteDataClass):
     id: Optional[int]
+    mountpoint_id: int
     filename: str
     fullpath: str
     review: Optional[str]
@@ -170,8 +214,8 @@ class FileIndexRecord(SQLiteDataClass):
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
-            "INSERT INTO files (filename, fullpath, review, rating) VALUES (?, ?, ?, ?)",
-            (self.filename, self.fullpath, self.review, self.rating)
+            "INSERT INTO files (mountpoint_id, filename, fullpath, review, rating) VALUES (?, ?, ?, ?, ?)",
+            (self.mountpoint_id, self.filename, self.fullpath, self.review, self.rating)
         )
         self.id = cursor.lastrowid
         return self.id

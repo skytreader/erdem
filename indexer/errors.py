@@ -17,4 +17,24 @@ class InvalidDataClassState(Exception):
         self.state_desc = state_desc
 
     def __str__(self):
-        return
+        return self.state_desc
+
+class MountpointUnderivable(Exception):
+    """
+    Throw this if we are asked to index a file path without a clear mountpoint.
+    """
+
+    def __init__(self, index_path: str):
+        self.index_path = index_path
+
+    def __str__(self):
+        return f"Can't figure out mountpoint of {self.index_path}."
+
+class MountpointMisMatch(Exception):
+
+    def __init__(self, mismatched_path: str, mountpoint: str):
+        self.mismatched_path = mismatched_path
+        self.mountpoint = mountpoint
+
+    def __str__(self):
+        return f"Mountpoint mismatch: {self.mountpoint} - {self.mismatched_path}"
