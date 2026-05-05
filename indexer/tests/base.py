@@ -27,7 +27,8 @@ class SQLiteTest(unittest.TestCase):
 
     def setUp(self):
         self.indexerdem.init()
-        self.default_mountpoint = MountpointRecord(None, "/media/default").insert(self.cursor)
+        self.default_mountpoint = MountpointRecord(None, "/media/default")
+        self.default_mountpoint.insert(self.cursor)
 
     def tearDown(self):
         self.cursor.executescript(

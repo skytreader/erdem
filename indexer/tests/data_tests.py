@@ -107,8 +107,8 @@ class PerformanceIndexRecordTests(SQLiteTest):
         super().setUp()
         self.everything_everywhere = self.insert(
             FileIndexRecord,
-            self.default_mountpoint,
             None,
+            self.default_mountpoint,
             "Everything, Everywhere, All at Once.mp4",
             "/",
             "",
@@ -132,8 +132,8 @@ class PerformanceIndexRecordTests(SQLiteTest):
         )
         self.p_and_r = self.insert(
             FileIndexRecord,
-            self.default_mountpoint,
             None,
+            self.default_mountpoint,
             "Parks and Recreation - Bailout.mp4",
             "/",
             "",

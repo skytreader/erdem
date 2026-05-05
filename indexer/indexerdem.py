@@ -375,12 +375,12 @@ class Indexerdem(object):
             if activity_status is not None else
             "SELECT * FROM persons"
         )
-        return tuple(PersonIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
+        return tuple(PersonIndexRecord.from_sqlite_record(cursor, row) for row in cursor.execute(query).fetchall())
     
     def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
         query = f"SELECT id, mountpoint_id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
-        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+        return tuple(FileIndexRecord.from_sqlite_record(cursor, row) for row in cursor.execute(query).fetchall())
 
     def search_performers(self, searchterm: str) -> Union[tuple[PersonIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()

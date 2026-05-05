@@ -1,9 +1,9 @@
 from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import StrEnum
-from typing import Any, cast, Iterable, Optional, List, Set, Tuple, Union
+from typing import Any, cast, ClassVar, Iterable, Optional, List, Set, Tuple, Union
 
 class NameDecisionRule(StrEnum):
     ALMOST_CERTAIN = "almost-certain"
@@ -18,6 +18,7 @@ class SQLiteDataClass(ABC):
 
     UPDATE_QUERY = ""
     DELETE_QUERY = ""
+    COL_MAPPING: ClassVar[dict[str, str]] = {}
 
     @staticmethod
     @abstractmethod
@@ -32,7 +33,7 @@ class SQLiteDataClass(ABC):
 
     @staticmethod
     @abstractmethod
-    def from_sqlite_record(record: tuple[Any, ...]) -> "SQLiteDataClass":
+    def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "SQLiteDataClass":
         """
         Construct an instance of this class from the result of an SQLite query.
         The order of data in `record` would vary per class and should be noted
@@ -79,7 +80,7 @@ class SQLiteDataClass(ABC):
             return False
 
 
-def starfields(cls, noid: bool = False) -> str:
+def starfields(cls, noid: bool = False, col_mapping: Optional[dict[str, str]] = None) -> str:
     """
     Return a comma-separated string listing all the fields of this class.
     The order output is consistent with, for example, `from_sqlite_record`.
@@ -92,11 +93,24 @@ def starfields(cls, noid: bool = False) -> str:
     > in which they appear in the class definition.
 
     But the thing is, `fields` is not a generated method!
+
+    Params:
+
+    cls -- The dataclass we are listing the fields of
+    noid -- If True we list the fields omitting a field named "id"
+    col_mapping -- A dictionary mapping dataclass field names to SQL columns.
+    You only need to specify those that actually differ.
     """
+    def _map(name):
+        if col_mapping is None:
+            return name
+        else:
+            return col_mapping.get(name, name)
+
     if noid:
-        return ",".join([f.name for f in fields(cls) if f.name != "id"])
+        return ",".join([_map(f.name) for f in fields(cls) if f.name != "id"])
     else:
-        return ",".join([f.name for f in fields(cls)])
+        return ",".join([_map(f.name) for f in fields(cls)])
 
 
 @dataclass
@@ -123,7 +137,7 @@ class MetadataRecord(SQLiteDataClass):
         return MetadataRecord(*result) if result is not None else None
 
     @staticmethod
-    def from_sqlite_record(record: tuple[Any, ...]) -> "MetadataRecord":
+    def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "MetadataRecord":
         raise ConstructorPreferred()
     
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
@@ -164,12 +178,12 @@ class MountpointRecord(SQLiteDataClass):
 
     @staticmethod
     def fetch(cursor, id: str) -> Optional["MountpointRecord"]:
-        query = f"SELECT {starfields(MountpointRecord)} FROM MountpointRecord WHERE id=? LIMIT 1"
+        query = f"SELECT {starfields(MountpointRecord)} FROM mountpoints WHERE id=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
         return MountpointRecord(*result) if result is not None else None
     
     @staticmethod
-    def from_sqlite_record(record: tuple[Any, ...]) -> "MountpointRecord":
+    def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "MountpointRecord":
         raise ConstructorPreferred()
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
@@ -189,11 +203,15 @@ class MountpointRecord(SQLiteDataClass):
 @dataclass
 class FileIndexRecord(SQLiteDataClass):
     id: Optional[int]
-    mountpoint_id: int
+    mountpoint: MountpointRecord
     filename: str
     fullpath: str
     review: Optional[str]
     rating: int = 0
+
+    COL_MAPPING = {
+        "mountpoint": "mountpoint_id"
+    }
 
     def __post_init__(self):
         if self.rating is None:
@@ -204,18 +222,19 @@ class FileIndexRecord(SQLiteDataClass):
 
     @staticmethod
     def fetch(cursor, id) -> Optional["FileIndexRecord"]:
-        query = f"SELECT {starfields(FileIndexRecord)} FROM files WHERE id=? LIMIT 1"
+        query = f"SELECT {starfields(FileIndexRecord, col_mapping=FileIndexRecord.COL_MAPPING)} FROM files WHERE id=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
-        return FileIndexRecord(*result) if result is not None else None
+        return FileIndexRecord.from_sqlite_record(cursor, result) if result is not None else None
 
     @staticmethod
-    def from_sqlite_record(record: tuple[Any, ...]) -> "FileIndexRecord":
-        raise ConstructorPreferred()
+    def from_sqlite_record(cursor, record: tuple[int, int, str, str, Optional[str], int]) -> "FileIndexRecord":
+        mountpoint = MountpointRecord.fetch(cursor, record[1])
+        return FileIndexRecord(record[0], mountpoint, record[2], record[3], record[4], record[5])
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
-            "INSERT INTO files (mountpoint_id, filename, fullpath, review, rating) VALUES (?, ?, ?, ?, ?)",
-            (self.mountpoint_id, self.filename, self.fullpath, self.review, self.rating)
+            f"INSERT INTO files ({starfields(FileIndexRecord, True, FileIndexRecord.COL_MAPPING)}) VALUES (?, ?, ?, ?, ?)",
+            (self.mountpoint.id, self.filename, self.fullpath, self.review, self.rating)
         )
         self.id = cursor.lastrowid
         return self.id
@@ -241,10 +260,10 @@ class PersonIndexRecord(SQLiteDataClass):
     def fetch(cursor, id) -> Optional["PersonIndexRecord"]:
         query = f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE id=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
-        return PersonIndexRecord.from_sqlite_record(result) if result is not None else None
+        return PersonIndexRecord.from_sqlite_record(cursor, result) if result is not None else None
 
     @staticmethod
-    def from_sqlite_record(record: tuple[int, str, str, str, int]) -> "PersonIndexRecord":
+    def from_sqlite_record(cursor, record: tuple[int, str, str, str, int]) -> "PersonIndexRecord":
         return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]), record[4])
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
@@ -273,7 +292,7 @@ class PersonIndexRecord(SQLiteDataClass):
                 f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE firstname=? AND lastname IS NULL LIMIT 1;", (firstname,)).fetchone()
 
         if test:
-            return PersonIndexRecord.from_sqlite_record(test)
+            return PersonIndexRecord.from_sqlite_record(cursor, test)
         else:
             return None
 
@@ -363,7 +382,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             raise InvalidDataClassState("Object must be performer rooted to add performances.")
 
     @staticmethod
-    def from_sqlite_record(record: tuple[Any, ...]) -> "PerformanceIndexRecord":
+    def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
 
     def insert(self, cursor, extra_args: Optional["PerformanceIndexRecord.ExtraArgs"] = None) -> Optional[int]:
