@@ -75,7 +75,7 @@ class Indexerdem(object):
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
     DEFAULT_LOCALES = ("en", "en_GB", "en_US", "en_NZ")
     # I can't be arsed about edge cases at the moment haha
-    MOUNTPOINT_RE = re.compile(r"(/media/[A-Za-z0-9]+)/.+")
+    MOUNTPOINT_RE = re.compile(r"(?P<mountpoint>/media/[A-Za-z0-9]+/[A-Za-z0-9]+)(?P<restpath>/.+)")
 
     # The version of the index produced. This will be saved in the DB as
     # metadata. The major version should guarantee compatibility with similar
@@ -145,6 +145,7 @@ class Indexerdem(object):
                 fullpath TEXT NOT NULL,
                 rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
                 review TEXT,
+                UNIQUE(mountpoint_id, fullpath, filename),
                 FOREIGN KEY(mountpoint_id) REFERENCES mountpoints(id)
             );
             """
@@ -271,22 +272,40 @@ class Indexerdem(object):
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
         def make_canonical(absolute_path: str) -> str:
+            if self.mountpoint and absolute_path.startswith(self.mountpoint):
+                fullpath_parse = Indexerdem.MOUNTPOINT_RE.match(absolute_path)
+                absolute_path = fullpath_parse.group("pathrest")
+
             if absolute_path[-1] != os.path.sep:
                 return f"{absolute_path}{os.path.sep}"
 
             return absolute_path
 
-        if self.mountpoint and not fullpath.startswith(self.mountpoint):
-            raise MountpointMisMatch(fullpath, self.mountpoint)
+        def decide_mountpoint(cursor, absolute_path: str) -> MountpointRecord:
+            """
+            Decide the mountpoint when self.mountpoint is None.
+            """
+            if (mount_match := Indexerdem.MOUNTPOINT_RE.match(absolute_path)):
+                mountpath = mount_match.group("mount")
+                if (mountcheck := cursor.execute("SELECT * FROM mountpoints WHERE path=?", (mountpath,))):
+                    return MountpointRecord.from_sqlite_record(cursor, mountcheck)
+                else:
+                    new_mount = MountpointRecord(None, mountpath)
+                    new_mount.insert()
+                    return new_mount
+            else:
+                raise MountpointUnderivable(absolute_path)
 
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1
             cursor = self.conn.cursor()
+            # Determine which mountpoint we should use
+            mountpoint = self.mountpoint if self.mountpoint else decide_mountpoint(cursor, fullpath)
             canon_fullpath = make_canonical(fullpath)
             try:
-                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, canon_fullpath))
-                file_id = cursor.lastrowid
+                file_record = FileIndexRecord(None, mountpoint, filename, canon_fullpath, None, 0)
+                file_id = file_record.insert(cursor)
             except sqlite3.IntegrityError:
                 file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, canon_fullpath)).fetchone()[0]
                 logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
