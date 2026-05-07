@@ -275,13 +275,15 @@ class Indexerdem(object):
         else:
             return None
 
-    def index(self, filename: str, fullpath: str) -> None:
+    def index(self, filename: str, fullpath: str) -> Optional[FileIndexRecord]:
         def decide_certainty(nametpl: NameTuple) -> bool:
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
         def make_canonical(absolute_path: str) -> str:
-            if self.mountpoint and absolute_path.startswith(self.mountpoint):
-                fullpath_parse = Indexerdem.MOUNTPOINT_RE.match(absolute_path)
+            """
+            We assume the mountpoint has been decided at this point.
+            """
+            if (fullpath_parse := Indexerdem.MOUNTPOINT_RE.match(absolute_path)):
                 absolute_path = fullpath_parse.group("restpath")
 
             if absolute_path[-1] != os.path.sep:
@@ -303,7 +305,14 @@ class Indexerdem(object):
                     return new_mount
             else:
                 raise MountpointUnderivable(absolute_path)
-
+        if all(
+            (
+                self.mountpoint is not None,
+                Indexerdem.MOUNTPOINT_RE.match(absolute_path),
+                not absolute_path.startswith(self.mountpoint)
+            )
+        ):
+            raise MountpointMisMatch(absolute_path, self.mountpoint)
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1
@@ -357,6 +366,7 @@ class Indexerdem(object):
                         )
                     except sqlite3.IntegrityError:
                         logger.warn(f"Some persons are already associated with {file_record}")
+                    return file_record
         except:
             logger.exception("Ran into some problems...")
         finally:

@@ -12,6 +12,13 @@ class IndexerdemTests(SQLiteTest):
         assert matches.group("mountpoint") == "/media/chad/CHALDEA"
         assert matches.group("restpath") == "/Video/path"
 
+    def test_index(self):
+        path = "/media/chad/CHALDEA/Video/path"
+        index_record = self.indexerdem.index("The Magnus Archive.mp4", path)
+        assert index_record is not None
+        assert index_record.filename == "The Magnus Archive.mp4"
+        assert index_record.fullpath == "/Video/path/"
+
     def test_search_files(self):
         messi_files = self.indexerdem.search_files("messi")
         assert len(messi_files) == 0
