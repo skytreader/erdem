@@ -1,9 +1,16 @@
 from .base import SQLiteTest
 
 from ..data import FileIndexRecord, MetadataRecord, PersonIndexRecord
-from ..indexerdem import MetadataCheckResult, NameDecisionRule
+from ..indexerdem import Indexerdem, MetadataCheckResult, NameDecisionRule
 
 class IndexerdemTests(SQLiteTest):
+
+    def test_mountpoint_regex(self):
+        path = "/media/chad/CHALDEA/Video/path"
+        matches = Indexerdem.MOUNTPOINT_RE.match(path)
+        assert matches
+        assert matches.group("mountpoint") == "/media/chad/CHALDEA"
+        assert matches.group("restpath") == "/Video/path"
 
     def test_search_files(self):
         messi_files = self.indexerdem.search_files("messi")

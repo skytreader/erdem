@@ -10,7 +10,10 @@ class SQLiteTest(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(SQLiteTest, self).__init__(*args, **kwargs)
-        self.indexerdem = Indexerdem(f"/tmp/indexerdem-tests-{uuid.uuid1()}.db")
+        self.indexerdem = Indexerdem(
+            f"/tmp/indexerdem-tests-{uuid.uuid1()}.db",
+            ("en", "en_GB", "en_US", "en_NZ")
+        )
 
     @property
     def cursor(self):

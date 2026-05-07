@@ -8,7 +8,15 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
-from .data import FileIndexRecord, MetadataRecord, NameDecisionRule, NameTuple, PerformanceIndexRecord, PersonIndexRecord
+from .data import (
+    FileIndexRecord,
+    MountpointRecord,
+    MetadataRecord,
+    NameDecisionRule,
+    NameTuple,
+    PerformanceIndexRecord,
+    PersonIndexRecord
+)
 from .errors import MountpointMisMatch, MountpointUnderivable
 
 from argparse import ArgumentParser
@@ -274,7 +282,7 @@ class Indexerdem(object):
         def make_canonical(absolute_path: str) -> str:
             if self.mountpoint and absolute_path.startswith(self.mountpoint):
                 fullpath_parse = Indexerdem.MOUNTPOINT_RE.match(absolute_path)
-                absolute_path = fullpath_parse.group("pathrest")
+                absolute_path = fullpath_parse.group("restpath")
 
             if absolute_path[-1] != os.path.sep:
                 return f"{absolute_path}{os.path.sep}"
@@ -286,12 +294,12 @@ class Indexerdem(object):
             Decide the mountpoint when self.mountpoint is None.
             """
             if (mount_match := Indexerdem.MOUNTPOINT_RE.match(absolute_path)):
-                mountpath = mount_match.group("mount")
-                if (mountcheck := cursor.execute("SELECT * FROM mountpoints WHERE path=?", (mountpath,))):
-                    return MountpointRecord.from_sqlite_record(cursor, mountcheck)
+                mountpath = mount_match.group("mountpoint")
+                if (mountcheck := cursor.execute("SELECT id, path FROM mountpoints WHERE path=? LIMIT 1", (mountpath,)).fetchone()):
+                    return MountpointRecord(mountcheck[0], mountcheck[1])
                 else:
                     new_mount = MountpointRecord(None, mountpath)
-                    new_mount.insert()
+                    new_mount.insert(cursor)
                     return new_mount
             else:
                 raise MountpointUnderivable(absolute_path)
@@ -337,7 +345,7 @@ class Indexerdem(object):
                     logger.error("Found an odd name: %s" % str(name))
 
             if file_id is not None and file_id != -1:
-                if (file_record := FileIndexRecord.fetch(cursor, file_id)) is not None:
+                if file_record is not None:
                     perf_record = PerformanceIndexRecord(
                         files=file_record,
                         performers=tuple(spam for spam in (PersonIndexRecord.fetch(cursor, pid) for pid in persons) if spam is not None)
