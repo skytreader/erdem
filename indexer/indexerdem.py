@@ -305,14 +305,12 @@ class Indexerdem(object):
                     return new_mount
             else:
                 raise MountpointUnderivable(absolute_path)
-        if all(
-            (
-                self.mountpoint is not None,
-                Indexerdem.MOUNTPOINT_RE.match(absolute_path),
-                not absolute_path.startswith(self.mountpoint)
-            )
+        if (
+            self.mountpoint is not None and
+            Indexerdem.MOUNTPOINT_RE.match(fullpath) and
+            not fullpath.startswith(self.mountpoint.path)
         ):
-            raise MountpointMisMatch(absolute_path, self.mountpoint)
+            raise MountpointMisMatch(fullpath, self.mountpoint)
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1

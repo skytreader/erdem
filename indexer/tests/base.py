@@ -30,7 +30,9 @@ class SQLiteTest(unittest.TestCase):
 
     def setUp(self):
         self.indexerdem.init()
-        self.default_mountpoint = MountpointRecord(None, "/media/default")
+        # Right now our default usage does not pass a mountpoint field. So we
+        # set tests up to reflect. Subject to change in the future.
+        self.default_mountpoint = MountpointRecord(None, "/media/erdem/default")
         self.default_mountpoint.insert(self.cursor)
 
     def tearDown(self):

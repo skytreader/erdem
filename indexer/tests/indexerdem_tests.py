@@ -1,7 +1,10 @@
 from .base import SQLiteTest
 
 from ..data import FileIndexRecord, MetadataRecord, PersonIndexRecord
+from ..errors import MountpointMisMatch
 from ..indexerdem import Indexerdem, MetadataCheckResult, NameDecisionRule
+
+import pytest
 
 class IndexerdemTests(SQLiteTest):
 
@@ -18,6 +21,10 @@ class IndexerdemTests(SQLiteTest):
         assert index_record is not None
         assert index_record.filename == "The Magnus Archive.mp4"
         assert index_record.fullpath == "/Video/path/"
+        
+        self.indexerdem.mountpoint = self.default_mountpoint
+        with pytest.raises(MountpointMisMatch) as exc_info:
+            self.indexerdem.index("From the Library of Jürgen Leitner.mp4", path)
 
     def test_search_files(self):
         messi_files = self.indexerdem.search_files("messi")
