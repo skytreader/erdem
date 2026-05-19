@@ -149,9 +149,9 @@ class ErdemHomeScreen(ErdemScreen):
 
     def action_switch_tab(self) -> None:
         if self.list_tabs.active == "media-tab":
-            self.query_one("#list-tabs").active = "performers-tab"
+            self.list_tabs.active = "performers-tab"
         elif self.list_tabs.active == "performers-tab":
-            self.query_one("#list-tabs").active = "media-tab"
+            self.list_tabs.active = "media-tab"
 
     def search_worker(self, query: str) -> None:
         is_search_worthy = len(query) >= 3
@@ -193,58 +193,66 @@ class MediaView(ErdemScreen):
     def __init__(self, id: int):
         super().__init__()
         self.record = FileIndexRecord.fetch(self.erdem_app.index.conn.cursor(), id)
-        self.is_error_state = self.record is None
-        # Don't use is_error_state for mypy
+        self.error_str = ""
         if self.record is not None:
             performers_result = PerformanceIndexRecord.fetch(
                 self.erdem_app.index.conn.cursor(),
                 self.record
             )
             self.performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
+        else:
+            self.error_str = f"Can't find performer with id {id}"
 
     def __update_object(self):
         self.record.rating = int(self.query_one("#rating-input").value)
 
     def compose(self) -> ComposeResult:
         yield Header()
-        ##############
-        yield Label(self.record.filename if self.record is not None else "Unknown", id="record-title", classes="span2")
-        yield HorizontalGroup(
-            Button("Save", id="save-record", flat=True),
-            Button("Delete", id="delete-record", flat=True),
-            classes="span1"
-        )
-        ##############
-        yield Label("Fullpath:", classes="span1")
-        yield Label(self.record.fullpath, classes="span2")
-        ##############
-        yield Label("Rating:", classes="span1")
-        yield GoodInput(
-            classes="span2",
-            type="integer",
-            value=str(self.record.rating),
-            id="rating-input"
-        )
-        ##############
-        yield HorizontalGroup(
-            Label("Performers:", classes="actionable-title"),
-            Button("+", id="add-performer", flat=True),
-            Button("x", variant="warning", id="remove-performer", flat=True),
-            classes="span3"
-        )
-        yield OptionList(
-            *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
-            id="performers-list",
-            classes="span3"
-        )
-        ##############
-        yield HorizontalGroup(
-            Label("Review:", classes="actionable-title"),
-            Button("Edit", id="edit-review", flat=True),
-            classes="span3"
-        )
-        yield Markdown(classes="span3")
-        ##############
+        if self.record:
+            ##############
+            yield Label(self.record.filename if self.record is not None else "Unknown", id="record-title", classes="span2")
+            yield HorizontalGroup(
+                Button("Save", id="save-record", flat=True),
+                Button("Delete", id="delete-record", flat=True),
+                classes="span1"
+            )
+            ##############
+            yield Label("Fullpath:", classes="span1")
+            yield Label(self.record.fullpath, classes="span2")
+            ##############
+            yield Label("Rating:", classes="span1")
+            yield GoodInput(
+                classes="span2",
+                type="integer",
+                value=str(self.record.rating),
+                id="rating-input"
+            )
+            ##############
+            yield HorizontalGroup(
+                Label("Performers:", classes="actionable-title"),
+                Button("+", id="add-performer", flat=True),
+                Button("x", variant="warning", id="remove-performer", flat=True),
+                classes="span3"
+            )
+            yield OptionList(
+                *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
+                id="performers-list",
+                classes="span3"
+            )
+            ##############
+            yield HorizontalGroup(
+                Label("Review:", classes="actionable-title"),
+                Button("Edit", id="edit-review", flat=True),
+                classes="span3"
+            )
+            yield Markdown(classes="span3")
+        else:
+            error = Static(f"Error: {self.error_str}")
+            error.styles.background = "red"
+            error.styles.color = "white"
+            error.styles.padding = (1, 2)
+            yield error
+
         yield Footer()
 
     def on_mount(self) -> None:
@@ -272,11 +280,13 @@ def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
         Button("x", variant="warning", id="remove-performance", flat=True, classes="list-action"),
         classes="span1 list-action"
     )
-    yield OptionList(
-        *tuple(Option(str(_file)) for _file in record.load_performances(cursor)),
-        id="performances-list",
-        classes="span3"
-    )
+    performances = record.load_performances(cursor)
+    if performances:
+        yield OptionList(
+            *tuple(Option(str(_file)) for _file in performances),
+            id="performances-list",
+            classes="span3"
+        )
 
 class PerformerView(ErdemScreen):
     CSS_PATH = "tcss/record-view.tcss"
@@ -302,7 +312,11 @@ class PerformerView(ErdemScreen):
             yield Header()
 
         if self.error_str is None:
-            yield from performer_record_form(self.performer, self.erdem_app.cursor)
+            if self.performer:
+                yield from performer_record_form(
+                    self.performer,
+                    self.erdem_app.cursor
+                )
         else:
             error = Static(f"Error: {self.error_str}")
             error.styles.background = "red"
@@ -328,10 +342,11 @@ class PerformerModal(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with CenterMiddle(id="modal-container"):
-            yield from performer_record_form(
-                self.parent_screen.performer,
-                self.parent_screen.erdem_app.cursor
-            )
+            if self.parent_screen.performer:
+                yield from performer_record_form(
+                    self.parent_screen.performer,
+                    self.parent_screen.erdem_app.cursor
+                )
 
     def action_close(self):
         self.app.pop_screen()

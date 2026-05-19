@@ -177,7 +177,7 @@ class MountpointRecord(SQLiteDataClass):
     """
 
     @staticmethod
-    def fetch(cursor, id: str) -> Optional["MountpointRecord"]:
+    def fetch(cursor, id: int) -> Optional["MountpointRecord"]:
         query = f"SELECT {starfields(MountpointRecord)} FROM mountpoints WHERE id=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
         return MountpointRecord(*result) if result is not None else None
@@ -185,6 +185,16 @@ class MountpointRecord(SQLiteDataClass):
     @staticmethod
     def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "MountpointRecord":
         raise ConstructorPreferred()
+
+    @staticmethod
+    def to_mountpoint_record(cursor, mountpoint_path: str) -> "MountpointRecord":
+        query = f"SELECT {starfields(MountpointRecord)} FROM mountpoints WHERE path=? LIMIT 1"
+        if (record := cursor.execute(query, (mountpoint_path,)).fetchone()):
+            return MountpointRecord(*record)
+        else:
+            record = MountpointRecord(None, mountpoint_path)
+            record.insert(cursor)
+            return record
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
@@ -229,7 +239,10 @@ class FileIndexRecord(SQLiteDataClass):
     @staticmethod
     def from_sqlite_record(cursor, record: tuple[int, int, str, str, Optional[str], int]) -> "FileIndexRecord":
         mountpoint = MountpointRecord.fetch(cursor, record[1])
-        return FileIndexRecord(record[0], mountpoint, record[2], record[3], record[4], record[5])
+        if mountpoint:
+            return FileIndexRecord(record[0], mountpoint, record[2], record[3], record[4], record[5])
+        else:
+            raise ValueError(f"Can't find provided mountpoint in record: {record}")
 
     def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
         cursor.execute(
@@ -277,7 +290,10 @@ class PersonIndexRecord(SQLiteDataClass):
 
     def load_performances(self, cursor) -> Optional[tuple[FileIndexRecord, ...]]:
         _perfs = PerformanceIndexRecord.fetch(cursor, self)
-        return _perfs.files
+        if _perfs:
+            return cast(tuple[FileIndexRecord, ...], _perfs.files)
+        else:
+            return None
 
     @staticmethod
     def find_by_name(cursor, firstname: str, lastname: Optional[str]) -> Optional["PersonIndexRecord"]:

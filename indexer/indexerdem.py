@@ -107,7 +107,12 @@ class Indexerdem(object):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
-        self.mountpoint = mountpoint
+        self.mountpoint: Optional[MountpointRecord] = None
+        if mountpoint:
+            self.mountpoint = MountpointRecord.to_mountpoint_record(
+                self.conn.cursor(),
+                mountpoint
+            )
         self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
         if locales is None:
             runtime_locale = pylocale.getlocale()
@@ -310,7 +315,7 @@ class Indexerdem(object):
             Indexerdem.MOUNTPOINT_RE.match(fullpath) and
             not fullpath.startswith(self.mountpoint.path)
         ):
-            raise MountpointMisMatch(fullpath, self.mountpoint)
+            raise MountpointMisMatch(fullpath, str(self.mountpoint))
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1
@@ -365,8 +370,10 @@ class Indexerdem(object):
                     except sqlite3.IntegrityError:
                         logger.warn(f"Some persons are already associated with {file_record}")
                     return file_record
+            return None
         except:
             logger.exception("Ran into some problems...")
+            return None
         finally:
             self.conn.commit()
 
