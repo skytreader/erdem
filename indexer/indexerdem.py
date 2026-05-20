@@ -15,7 +15,8 @@ from .data import (
     NameDecisionRule,
     NameTuple,
     PerformanceIndexRecord,
-    PersonIndexRecord
+    PersonIndexRecord,
+    starfields
 )
 from .errors import MountpointMisMatch, MountpointUnderivable
 
@@ -397,27 +398,35 @@ class Indexerdem(object):
 
     def fetch_files(self, limit: Optional[int] = None) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
+        all_fields = starfields(FileIndexRecord)
         query = (
-            f"SELECT * FROM files LIMIT={limit}"
+            f"SELECT {all_fields} FROM files LIMIT={limit}"
             if limit is not None else
-            "SELECT * FROM files"
+            f"SELECT {all_fields} FROM files"
         )
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
     
     def get_file_record_from_id(self, id: int) -> Optional[FileIndexRecord]:
         cursor = self.conn.cursor()
-        query = f"SELECT * FROM files WHERE id={id} LIMIT 1"
-        result = cursor.execute(query).fetchone()
+        query = f"SELECT {starfields(FileIndexRecord)} FROM files WHERE id=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
         return FileIndexRecord(*result) if result is not None else None
     
     def fetch_persons(self, activity_status: Optional[bool] = None) -> tuple[PersonIndexRecord, ...]:
         cursor = self.conn.cursor()
+        all_fields = starfields(PersonIndexRecord)
         query = (
-            f"SELECT * FROM persons WHERE is_deactivated={self.__sqliteify(activity_status)}"
+            f"SELECT {all_fields} FROM persons WHERE is_deactivated=?"
             if activity_status is not None else
-            "SELECT * FROM persons"
+            f"SELECT {all_fields} FROM persons"
         )
-        return tuple(PersonIndexRecord.from_sqlite_record(cursor, row) for row in cursor.execute(query).fetchall())
+        return tuple(
+            PersonIndexRecord.from_sqlite_record(cursor, row) for row in
+            cursor.execute(
+                query,
+                (self.__sqliteify(activity_status),)
+            ).fetchall()
+        )
     
     def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
