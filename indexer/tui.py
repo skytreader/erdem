@@ -49,14 +49,18 @@ class ErdemHomeScreen(ErdemScreen):
     NO_RESULTS_FOUND = Option("No results found.", disabled=True)
 
     def __init__(self):
-        super().__init__()
-        self.TITLES = self.app.index.fetch_files()
-        self.title_count = Dynamic()
-        self.__reset_title_list()
-        self.PERFORMERS = self.app.index.fetch_persons(False)
-        self.performer_count = Dynamic()
-        self.__reset_performer_list()
-        self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
+        try:
+            super().__init__()
+            self.TITLES = self.app.index.fetch_files()
+            self.title_count = Dynamic()
+            self.__reset_title_list()
+            self.PERFORMERS = self.app.index.fetch_persons(False)
+            self.performer_count = Dynamic()
+            self.__reset_performer_list()
+            self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
+            self.records_loaded = True
+        except OperationalError:
+            self.records_loaded = False
 
     def __reset_title_list(self):
         """
@@ -118,14 +122,23 @@ class ErdemHomeScreen(ErdemScreen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield GoodInput(placeholder="Search by title, tag, or performer", id="search-box")
-        with self.list_tabs:
-            with TabPane("Media", id="media-tab"):
-                yield self.title_count
-                yield self.shown_titles
-            with TabPane("Performers", id="performers-tab"):
-                yield self.performer_count
-                yield self.shown_performers
+
+        if self.records_loaded:
+            yield GoodInput(placeholder="Search by title, tag, or performer", id="search-box")
+            with self.list_tabs:
+                with TabPane("Media", id="media-tab"):
+                    yield self.title_count
+                    yield self.shown_titles
+                with TabPane("Performers", id="performers-tab"):
+                    yield self.performer_count
+                    yield self.shown_performers
+        else:
+            self.app.notify(
+                "Unable to load records. Please check index integrity.",
+                severity="error",
+                title="Index Corrupted"
+            )
+
         yield Footer()
 
     @on(OptionList.OptionSelected, "#performers-list")
