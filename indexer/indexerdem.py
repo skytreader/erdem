@@ -400,11 +400,11 @@ class Indexerdem(object):
         cursor = self.conn.cursor()
         all_fields = starfields(FileIndexRecord)
         query = (
-            f"SELECT {all_fields} FROM files LIMIT={limit}"
+            f"SELECT {all_fields} FROM files LIMIT=?"
             if limit is not None else
             f"SELECT {all_fields} FROM files"
         )
-        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+        return tuple(FileIndexRecord(*row) for row in cursor.execute(query, (limit,)).fetchall())
     
     def get_file_record_from_id(self, id: int) -> Optional[FileIndexRecord]:
         cursor = self.conn.cursor()

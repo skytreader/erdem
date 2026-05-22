@@ -17,6 +17,11 @@ class TestDataClass:
 def test_starfields():
     assert starfields(TestDataClass) == "id,firstname,lastname"
     assert starfields(TestDataClass, True) == "firstname,lastname"
+    assert starfields(
+        TestDataClass,
+        True,
+        {"firstname": "first_name", "lastname": "ln"}
+    ) == "first_name,ln"
 
 class FileIndexRecordTests(SQLiteTest):
 
