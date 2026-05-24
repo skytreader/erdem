@@ -8,7 +8,17 @@ Assumptions:
   in there.
 - Names are weird, the filenames even weirder/less standard.
 """
-from .data import FileIndexRecord, MetadataRecord, NameDecisionRule, NameTuple, PerformanceIndexRecord, PersonIndexRecord
+from .data import (
+    FileIndexRecord,
+    MountpointRecord,
+    MetadataRecord,
+    NameDecisionRule,
+    NameTuple,
+    PerformanceIndexRecord,
+    PersonIndexRecord,
+    starfields
+)
+from .errors import MountpointMisMatch, MountpointUnderivable
 
 from argparse import ArgumentParser
 from collections import OrderedDict
@@ -73,6 +83,8 @@ class Indexerdem(object):
 
     DEFAULT_EXTENSIONS = ("mp4", "avi", "flv", "mkv")
     DEFAULT_LOCALES = ("en", "en_GB", "en_US", "en_NZ")
+    # I can't be arsed about edge cases at the moment haha
+    MOUNTPOINT_RE = re.compile(r"(?P<mountpoint>/media/[A-Za-z0-9]+/[A-Za-z0-9]+)(?P<restpath>/.+)")
 
     # The version of the index produced. This will be saved in the DB as
     # metadata. The major version should guarantee compatibility with similar
@@ -80,16 +92,28 @@ class Indexerdem(object):
     # might produce inconsistencies when presenting the data; this usually means
     # the code handling the data has changed assumptions somewhat. Schema
     # changes are _always_ major version bumps.
-    INDEX_VERSION = "1.0"
+    INDEX_VERSION = "2.0"
     # The current version of this indexer. Follows semver. Major versions of
     # indexer should be able to continously work with similar major versions of
     # the index.
-    INDEXER_VERSION = "1.0.0"
+    INDEXER_VERSION = "2.0.0"
 
-    def __init__(self, index_filename: str, locales: Optional[Iterable[str]] = None, extensions: Optional[Iterable[str]] = None):
+    def __init__(
+        self,
+        index_filename: str,
+        locales: Optional[Iterable[str]] = None,
+        extensions: Optional[Iterable[str]] = None,
+        mountpoint: Optional[str] = None
+    ):
         self.conn = sqlite3.connect(index_filename)
         self.first_names_female: Set[str] = set()
         self.last_names: Set[str] = set()
+        self.mountpoint: Optional[MountpointRecord] = None
+        if mountpoint:
+            self.mountpoint = MountpointRecord.to_mountpoint_record(
+                self.conn.cursor(),
+                mountpoint
+            )
         self.extensions: Set[str] = set(extensions) if extensions is not None else set(Indexerdem.DEFAULT_EXTENSIONS)
         if locales is None:
             runtime_locale = pylocale.getlocale()
@@ -118,12 +142,28 @@ class Indexerdem(object):
         cursor.execute("""CREATE TABLE IF NOT EXISTS __metadata
                           (key TEXT PRIMARY KEY NOT NULL,
                            val TEXT NOT NULL);""")
-        cursor.execute("""CREATE TABLE IF NOT EXISTS files
-                          (id INTEGER PRIMARY KEY ASC,
-                           filename TEXT UNIQUE NOT NULL,
-                           fullpath TEXT NOT NULL,
-                           rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
-                           review TEXT);""")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS mountpoints (
+                id INTEGER PRIMARY KEY ASC,
+                path TEXT UNIQUE NOT NULL
+            );
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY ASC,
+                mountpoint_id INTEGER,
+                filename TEXT UNIQUE NOT NULL,
+                fullpath TEXT NOT NULL,
+                rating TINYINT DEFAULT 0 CHECK (0 <= rating AND rating <= 10),
+                review TEXT,
+                UNIQUE(mountpoint_id, fullpath, filename),
+                FOREIGN KEY(mountpoint_id) REFERENCES mountpoints(id)
+            );
+            """
+        )
         cursor.execute("""CREATE TABLE IF NOT EXISTS persons
                           (id INTEGER PRIMARY KEY ASC,
                            firstname TEXT NOT NULL,
@@ -241,24 +281,52 @@ class Indexerdem(object):
         else:
             return None
 
-    def index(self, filename: str, fullpath: str) -> None:
+    def index(self, filename: str, fullpath: str) -> Optional[FileIndexRecord]:
         def decide_certainty(nametpl: NameTuple) -> bool:
             return nametpl[2] == NameDecisionRule.ALMOST_CERTAIN
 
         def make_canonical(absolute_path: str) -> str:
+            """
+            We assume the mountpoint has been decided at this point.
+            """
+            if (fullpath_parse := Indexerdem.MOUNTPOINT_RE.match(absolute_path)):
+                absolute_path = fullpath_parse.group("restpath")
+
             if absolute_path[-1] != os.path.sep:
                 return f"{absolute_path}{os.path.sep}"
 
             return absolute_path
 
+        def decide_mountpoint(cursor, absolute_path: str) -> MountpointRecord:
+            """
+            Decide the mountpoint when self.mountpoint is None.
+            """
+            if (mount_match := Indexerdem.MOUNTPOINT_RE.match(absolute_path)):
+                mountpath = mount_match.group("mountpoint")
+                if (mountcheck := cursor.execute("SELECT id, path FROM mountpoints WHERE path=? LIMIT 1", (mountpath,)).fetchone()):
+                    return MountpointRecord(mountcheck[0], mountcheck[1])
+                else:
+                    new_mount = MountpointRecord(None, mountpath)
+                    new_mount.insert(cursor)
+                    return new_mount
+            else:
+                raise MountpointUnderivable(absolute_path)
+        if (
+            self.mountpoint is not None and
+            Indexerdem.MOUNTPOINT_RE.match(fullpath) and
+            not fullpath.startswith(self.mountpoint.path)
+        ):
+            raise MountpointMisMatch(fullpath, str(self.mountpoint))
         try:
             cleaned = self.__normalize_filename(filename)
             file_id: Optional[int] = -1
             cursor = self.conn.cursor()
+            # Determine which mountpoint we should use
+            mountpoint = self.mountpoint if self.mountpoint else decide_mountpoint(cursor, fullpath)
             canon_fullpath = make_canonical(fullpath)
             try:
-                cursor.execute("INSERT INTO files (filename, fullpath) VALUES (?, ?)", (filename, canon_fullpath))
-                file_id = cursor.lastrowid
+                file_record = FileIndexRecord(None, mountpoint, filename, canon_fullpath, None, 0)
+                file_id = file_record.insert(cursor)
             except sqlite3.IntegrityError:
                 file_id = cursor.execute("SELECT id FROM files WHERE filename=? AND fullpath=? LIMIT 1;", (filename, canon_fullpath)).fetchone()[0]
                 logger.warn("File %s%s previously indexed as id %s." % (fullpath, filename, file_id))
@@ -290,7 +358,7 @@ class Indexerdem(object):
                     logger.error("Found an odd name: %s" % str(name))
 
             if file_id is not None and file_id != -1:
-                if (file_record := FileIndexRecord.fetch(cursor, file_id)) is not None:
+                if file_record is not None:
                     perf_record = PerformanceIndexRecord(
                         files=file_record,
                         performers=tuple(spam for spam in (PersonIndexRecord.fetch(cursor, pid) for pid in persons) if spam is not None)
@@ -302,8 +370,11 @@ class Indexerdem(object):
                         )
                     except sqlite3.IntegrityError:
                         logger.warn(f"Some persons are already associated with {file_record}")
+                    return file_record
+            return None
         except:
             logger.exception("Ran into some problems...")
+            return None
         finally:
             self.conn.commit()
 
@@ -327,32 +398,47 @@ class Indexerdem(object):
 
     def fetch_files(self, limit: Optional[int] = None) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
-        query = (
-            f"SELECT * FROM files LIMIT={limit}"
-            if limit is not None else
-            "SELECT * FROM files"
+        has_limit = limit is not None
+        all_fields = starfields(
+            FileIndexRecord,
+            col_mapping={
+                "mountpoint": "mountpoint_id"
+            }
         )
-        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+        bindings = (limit,) if has_limit else tuple()
+        query = (
+            f"SELECT {all_fields} FROM files LIMIT=?"
+            if has_limit else
+            f"SELECT {all_fields} FROM files"
+        )
+        return tuple(FileIndexRecord(*row) for row in cursor.execute(query, bindings).fetchall())
     
     def get_file_record_from_id(self, id: int) -> Optional[FileIndexRecord]:
         cursor = self.conn.cursor()
-        query = f"SELECT * FROM files WHERE id={id} LIMIT 1"
-        result = cursor.execute(query).fetchone()
+        query = f"SELECT {starfields(FileIndexRecord)} FROM files WHERE id=? LIMIT 1"
+        result = cursor.execute(query, (id,)).fetchone()
         return FileIndexRecord(*result) if result is not None else None
     
     def fetch_persons(self, activity_status: Optional[bool] = None) -> tuple[PersonIndexRecord, ...]:
         cursor = self.conn.cursor()
+        all_fields = starfields(PersonIndexRecord)
         query = (
-            f"SELECT * FROM persons WHERE is_deactivated={self.__sqliteify(activity_status)}"
+            f"SELECT {all_fields} FROM persons WHERE is_deactivated=?"
             if activity_status is not None else
-            "SELECT * FROM persons"
+            f"SELECT {all_fields} FROM persons"
         )
-        return tuple(PersonIndexRecord.from_sqlite_record(row) for row in cursor.execute(query).fetchall())
+        return tuple(
+            PersonIndexRecord.from_sqlite_record(cursor, row) for row in
+            cursor.execute(
+                query,
+                (self.__sqliteify(activity_status),)
+            ).fetchall()
+        )
     
     def search_files(self, searchterm: str) -> Union[tuple[FileIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
-        query = f"SELECT id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
-        return tuple(FileIndexRecord(*row) for row in cursor.execute(query).fetchall())
+        query = f"SELECT id, mountpoint_id, filename, fullpath, review, rating FROM files WHERE filename LIKE '%{searchterm}%'"
+        return tuple(FileIndexRecord.from_sqlite_record(cursor, row) for row in cursor.execute(query).fetchall())
 
     def search_performers(self, searchterm: str) -> Union[tuple[PersonIndexRecord, ...], tuple]:
         cursor = self.conn.cursor()
@@ -374,7 +460,15 @@ if __name__ == "__main__":
         # TODO Ensure overwrite guarantee is true!
         help="filepath to output file. An existing file will be appended to."
     )
+    parser.add_argument(
+        "--mountpoint", "-m", type=str, required=False,
+        help="mountpoint of the drive"
+    )
     args = vars(parser.parse_args())
-    indexer: Indexerdem = Indexerdem(args["output"], args["locales"].split(","), Indexerdem.DEFAULT_EXTENSIONS)
+    indexer: Indexerdem = Indexerdem(
+        args["output"],
+        args["locales"].split(","),
+        Indexerdem.DEFAULT_EXTENSIONS
+    )
     indexer.init()
     indexer.readdir(args["filepath"])
