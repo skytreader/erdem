@@ -9,6 +9,7 @@ from textual.widgets import (
     TabbedContent, TabPane
 )
 from textual.widgets.option_list import Option
+from textual import log
 from typing import Any, cast, Iterable, Optional
 
 import os
@@ -59,8 +60,9 @@ class ErdemHomeScreen(ErdemScreen):
             self.__reset_performer_list()
             self.list_tabs = TabbedContent(initial="media-tab", id="list-tabs")
             self.records_loaded = True
-        except OperationalError:
+        except OperationalError as oe:
             self.records_loaded = False
+            self.app.log(error_string(oe))
 
     def __reset_title_list(self):
         """
