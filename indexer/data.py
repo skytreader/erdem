@@ -15,8 +15,15 @@ NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 
 @dataclass
 class SQLiteDataClass(ABC):
-
+    """
+    This is the most common update query for updating a single record. Must work
+    with `create_update_tuple`.
+    """
     UPDATE_QUERY = ""
+    """
+    This is the most common delete query for deleting a single record. Must work
+    with `create_delete_tuple`.
+    """
     DELETE_QUERY = ""
     COL_MAPPING: ClassVar[dict[str, str]] = {}
 
@@ -37,7 +44,7 @@ class SQLiteDataClass(ABC):
         """
         Construct an instance of this class from the result of an SQLite query.
         The order of data in `record` would vary per class and should be noted
-        down.
+        down. The types in `record` must be primitives _from_ SQLite.
 
         If you prefer that instances be constructed with the auto-generated
         constructor, throw a `ConstructorPreferred` error.
@@ -59,10 +66,16 @@ class SQLiteDataClass(ABC):
     
     @abstractmethod
     def create_update_tuple(self) -> tuple[Any, ...]:
+        """
+        Assemble the tuple to pass to UPDATE_QUERY.
+        """
         pass
 
     @abstractmethod
     def create_delete_tuple(self) -> tuple[Any, ...]:
+        """
+        Assemble the tuple to pass too DELETE_QUERY.
+        """
         pass
 
     def save(self, cursor) -> bool:
