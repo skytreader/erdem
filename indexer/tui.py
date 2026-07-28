@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
@@ -6,7 +7,7 @@ from textual.screen import ModalScreen, Screen
 from textual.widget import Widget
 from textual.widgets import (
     Button, Footer, Header, Label, Markdown, OptionList, Static,
-    TabbedContent, TabPane
+    TabbedContent, TabPane, TextArea
 )
 from textual.widgets.option_list import Option
 from textual import log
@@ -220,6 +221,7 @@ class MediaView(ErdemScreen):
 
     def __update_object(self):
         self.record.rating = int(self.query_one("#rating-input").value)
+        self.record.review = self.query_one("#review").value
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -260,7 +262,7 @@ class MediaView(ErdemScreen):
                 Button("Edit", id="edit-review", flat=True),
                 classes="span3"
             )
-            yield Markdown(classes="span3")
+            yield Markdown(self.record.review, classes="span3", id="review")
         else:
             error = Static(f"Error: {self.error_str}")
             error.styles.background = "red"
@@ -280,6 +282,14 @@ class MediaView(ErdemScreen):
             self.erdem_app.push_screen(PerformerModal(int(event.option.id)))
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
+
+    @on(Button.Pressed, "#edit-review")
+    async def show_edit_review_modal(self, event: Button.Pressed) -> None:
+        self.erdem_app.push_screen(
+            EditMarkdownModal(
+                self.record.review if self.record.review else ""
+            )
+        )
 
 def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
     yield Label(f"{record}", id="record-title", classes="span3")
@@ -365,6 +375,24 @@ class PerformerModal(ModalScreen):
 
     def action_close(self):
         self.app.pop_screen()
+
+class EditMarkdownModal(ModalScreen[str]):
+    BINDINGS = [
+        ("backspace", "close", "Close")
+    ]
+
+    def __init__(self, initial_value: str):
+        super().__init__()
+        self.initial_value = initial_value
+
+    def compose(self) -> ComposeResult:
+        with CenterMiddle():
+            # TODO make this highlight as markdown
+            yield TextArea(self.initial_value)
+            yield Button("Save", id="save")
+
+    def action_close(self):
+        self.dismiss(self.query_one(TextArea).text)
 
 class ErdemApp(App):
 
