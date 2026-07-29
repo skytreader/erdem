@@ -283,12 +283,15 @@ class MediaView(ErdemScreen):
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
+    def __update_review(self, review: str):
+        self.record.review = review
+        cast(Markdown, self.query_one("#review")).update(review)
+
     @on(Button.Pressed, "#edit-review")
     async def show_edit_review_modal(self, event: Button.Pressed) -> None:
         self.erdem_app.push_screen(
-            EditMarkdownModal(
-                self.record.review if self.record.review else ""
-            )
+            EditMarkdownModal(self.record.review if self.record.review else ""),
+            callback=self.__update_review
         )
 
 def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
@@ -391,6 +394,7 @@ class EditMarkdownModal(ModalScreen[str]):
             yield TextArea(self.initial_value)
             yield Button("Save", id="save")
 
+    @on(Button.Pressed, "#save")
     def action_close(self):
         self.dismiss(self.query_one(TextArea).text)
 
