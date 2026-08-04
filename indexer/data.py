@@ -82,8 +82,8 @@ class SQLiteDataClass(ABC):
         try:
             cursor.execute(type(self).UPDATE_QUERY, self.create_update_tuple())
             return True
-        except:
-            return False
+        except Exception:
+            raise
 
     def delete(self, cursor) -> bool:
         try:
@@ -236,6 +236,17 @@ class FileIndexRecord(SQLiteDataClass):
         "mountpoint": "mountpoint_id"
     }
 
+    UPDATE_QUERY = """
+        UPDATE files
+        SET mountpoint_id = ?,
+        filename = ?,
+        fullpath = ?,
+        review = ?,
+        rating = ?
+        WHERE id = ?
+        LIMIT 1;
+    """
+
     def __post_init__(self):
         if self.rating is None:
             self.rating = 0
@@ -269,7 +280,14 @@ class FileIndexRecord(SQLiteDataClass):
         return self.filename
 
     def create_update_tuple(self) -> tuple[Any, ...]:
-        return tuple()
+        return (
+            self.mountpoint.id,
+            self.filename,
+            self.fullpath,
+            self.review,
+            self.rating,
+            self.id
+        )
 
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return tuple()

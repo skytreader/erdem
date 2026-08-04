@@ -219,9 +219,9 @@ class MediaView(ErdemScreen):
         else:
             self.error_str = f"Can't find performer with id {id}"
 
-    def __update_object(self):
+    def __update_record_model(self):
         self.record.rating = int(self.query_one("#rating-input").value)
-        self.record.review = self.query_one("#review").value
+        self.record.review = self.query_one("#review").source
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -293,6 +293,15 @@ class MediaView(ErdemScreen):
             EditMarkdownModal(self.record.review if self.record.review else ""),
             callback=self.__update_review
         )
+
+    @on(Button.Pressed, "#save-record")
+    async def save_record(self, event: Button.Pressed) -> None:
+        self.__update_record_model()
+        if self.record.save(self.erdem_app.index.conn.cursor()):
+            self.erdem_app.notify("Record saved")
+        else:
+            self.erdem_app.notify("Failed to save record", severity="error")
+        self.erdem_app.index.conn.commit()
 
 def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
     yield Label(f"{record}", id="record-title", classes="span3")
