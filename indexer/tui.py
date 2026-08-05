@@ -290,7 +290,10 @@ class MediaView(ErdemScreen):
     @on(Button.Pressed, "#edit-review")
     async def show_edit_review_modal(self, event: Button.Pressed) -> None:
         self.erdem_app.push_screen(
-            EditMarkdownModal(self.record.review if self.record.review else ""),
+            EditMarkdownModal(
+                "Review",
+                self.record.review if self.record.review else ""
+            ),
             callback=self.__update_review
         )
 
@@ -393,19 +396,29 @@ class EditMarkdownModal(ModalScreen[str]):
         ("backspace", "close", "Close")
     ]
 
-    def __init__(self, initial_value: str):
+    def __init__(self, markdown_component_name, initial_value: str):
         super().__init__()
+        self.markdown_component_name = markdown_component_name
         self.initial_value = initial_value
 
     def compose(self) -> ComposeResult:
-        with CenterMiddle():
+        with CenterMiddle(id="modal-container"):
+            yield Label(f"Editing {self.markdown_component_name}", classes="span3")
             # TODO make this highlight as markdown
-            yield TextArea(self.initial_value)
-            yield Button("Save", id="save")
+            yield TextArea(self.initial_value, id="markdown-text")
+            yield HorizontalGroup(
+                Button("Save", id="save", variant="primary"),
+                Button("Cancel", id="cancel"),
+                classes="span3"
+            )
 
     @on(Button.Pressed, "#save")
     def action_close(self):
         self.dismiss(self.query_one(TextArea).text)
+
+    @on(Button.Pressed, "#cancel")
+    def action_cancel(self):
+        self.dismiss(self.initial_value)
 
 class ErdemApp(App):
 

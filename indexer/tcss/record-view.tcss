@@ -17,7 +17,7 @@ MediaView, PerformerView {
     background: $surface;
 }
 
-PerformerModal {
+PerformerModal, EditMarkdownModal {
     align: center middle;
 }
 
@@ -32,6 +32,17 @@ PerformerModal {
     border: thick $background 80%;
     background: $surface;
     padding: 3;
+}
+
+EditMarkdownModal {
+    #markdown-text {
+        column-span: 3;
+        /*
+         * I have no idea what the hell is going on here.
+         */
+        min-height: 50%;
+        height: 100%;
+    }
 }
 
 #performances-list {
