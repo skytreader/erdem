@@ -1,12 +1,15 @@
 from dataclasses import dataclass
+from unittest import mock
 
-from .base import SQLiteTest
+from .base import SQLiteTest, TestException
 
 from ..data import (
     FileIndexRecord, MetadataRecord, PerformanceIndexRecord, PersonIndexRecord,
     starfields
 )
 from ..indexerdem import NameDecisionRule
+
+import pytest
 
 @dataclass
 class TestDataClass:
@@ -36,6 +39,56 @@ class FileIndexRecordTests(SQLiteTest):
         assert file_record.id == insert_id
         testfile = self.cursor.execute("SELECT id, filename, fullpath, review, rating FROM files WHERE filename='test' LIMIT 1;").fetchone()
         assert file_record == FileIndexRecord(testfile[0], self.default_mountpoint, testfile[1], testfile[2], testfile[3], testfile[4])
+
+    def test_save(self):
+        # First the usual insertions
+        file_record = FileIndexRecord(None, self.default_mountpoint, "test", "/", "", 0)
+        assert file_record.id is None
+        insert_id = file_record.insert(self.cursor)
+        assert file_record is not None
+        assert insert_id is not None
+        assert file_record.id == insert_id
+        # some edit-specific assertions
+        assert file_record.rating == 0
+        assert file_record.review == ""
+
+        # edit it and save
+        file_record.rating = 5
+        file_record.review = "<3!"
+        assert file_record.save(self.cursor)
+
+        #refetch
+        record_refetch = FileIndexRecord.fetch(self.cursor, file_record.id)
+        assert record_refetch.rating == 5
+        assert record_refetch.review == "<3!"
+
+    def test_save_error(self):
+        # First the usual insertions
+        file_record = FileIndexRecord(None, self.default_mountpoint, "test", "/", "", 0)
+        assert file_record.id is None
+        insert_id = file_record.insert(self.cursor)
+        assert file_record is not None
+        assert insert_id is not None
+        assert file_record.id == insert_id
+        # some edit-specific assertions
+        assert file_record.rating == 0
+        assert file_record.review == ""
+
+        # edit it and save
+        file_record.rating = 5
+        file_record.review = "<3!"
+        with pytest.raises(TestException):
+            mock_cursor = mock.Mock(
+                **{
+                    "execute.side_effect": TestException
+                }
+            )
+            file_record.save(mock_cursor)
+
+        #refetch
+        record_refetch = FileIndexRecord.fetch(self.cursor, file_record.id)
+        assert record_refetch.rating == 0
+        assert record_refetch.review == ""
 
     def test_fetch(self):
         fine = FileIndexRecord(

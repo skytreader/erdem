@@ -46,3 +46,6 @@ class SQLiteTest(unittest.TestCase):
             DROP TABLE participation;
             """
         )
+
+class TestException(Exception):
+    pass
