@@ -306,20 +306,22 @@ class MediaView(ErdemScreen):
             self.erdem_app.notify("Failed to save record", severity="error")
         self.erdem_app.index.conn.commit()
 
-def performer_record_form(record: PersonIndexRecord, cursor) -> ComposeResult:
-    yield Label(f"{record}", id="record-title", classes="span3")
+def performer_record_form(record: PersonIndexRecord, cursor, is_modal: bool) -> ComposeResult:
     ###############################################
     yield Label("First name:", classes="span1")
     yield GoodInput(classes="span2", value=f"{record.firstname}")
     yield Label("Last name:", classes="span1")
     yield GoodInput(classes="span2", value=f"{record.lastname if record.lastname else ""}")
     ###############################################
-    yield Label("Performances:", classes="actionable-title span2")
-    yield HorizontalGroup(
-        Button("+", id="add-performance", flat=True, classes="list-action"),
-        Button("x", variant="warning", id="remove-performance", flat=True, classes="list-action"),
-        classes="span1 list-action"
-    )
+    if not is_modal:
+        yield HorizontalGroup(
+            Label("Performances:", classes="actionable-title"),
+            Button("+", id="add-performance", flat=True, classes="list-action"),
+            Button("x", variant="warning", id="remove-performance", flat=True, classes="list-action"),
+            classes="span3 list-action"
+        )
+    else:
+        yield Label("Performances:", classes="span3")
     performances = record.load_performances(cursor)
     if performances:
         yield OptionList(
@@ -355,7 +357,8 @@ class PerformerView(ErdemScreen):
             if self.performer:
                 yield from performer_record_form(
                     self.performer,
-                    self.erdem_app.cursor
+                    self.erdem_app.cursor,
+                    self.is_modal_view
                 )
         else:
             error = Static(f"Error: {self.error_str}")
@@ -370,7 +373,7 @@ class PerformerView(ErdemScreen):
         self.title = "Erdem"
         self.sub_title = f"Performer Notes - {self.performer}"
 
-class PerformerModal(ModalScreen):
+class PerformerModal(ModalScreen[PersonIndexRecord]):
     CSS_PATH = "tcss/record-view.tcss"
     BINDINGS = [
         ("backspace", "close", "Close")
@@ -385,7 +388,8 @@ class PerformerModal(ModalScreen):
             if self.parent_screen.performer:
                 yield from performer_record_form(
                     self.parent_screen.performer,
-                    self.parent_screen.erdem_app.cursor
+                    self.parent_screen.erdem_app.cursor,
+                    True
                 )
 
     def action_close(self):
