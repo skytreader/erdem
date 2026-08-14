@@ -307,6 +307,12 @@ class MediaView(ErdemScreen):
         self.erdem_app.index.conn.commit()
 
 def performer_record_form(record: PersonIndexRecord, cursor, is_modal: bool) -> ComposeResult:
+    yield HorizontalGroup(
+        Label(str(record), classes="performer-label"),
+        Button("Save", id="save-record", flat=True, classes="top-level-action"),
+        Button("Delete", id="delete-record", flat=True, classes="top-level-action"),
+        classes="span3"
+    )
     ###############################################
     yield Label("First name:", classes="span1")
     yield GoodInput(classes="span2", value=f"{record.firstname}")

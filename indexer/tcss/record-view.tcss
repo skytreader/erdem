@@ -61,6 +61,14 @@ EditMarkdownModal {
     column-span: 3;
 }
 
+Label.performer-label {
+    width: 70%;
+}
+
+Button.top-level-action {
+    max-width: 15%;
+}
+
 Button.list-action {
     min-width: 4;
 }
