@@ -147,6 +147,18 @@ class PersonIndexRecordTests(SQLiteTest):
             None
         ) is None
 
+    def test_save(self):
+        scarjo = PersonIndexRecord(
+            None,
+            "Scar",
+            "Johansson",
+            NameDecisionRule.ALMOST_CERTAIN,
+        )
+        scarjo.insert(self.cursor)
+        fetch_scarjo = PersonIndexRecord.fetch(self.cursor, scarjo.id)
+        scarjo.firstname = "Scarlett"
+        assert scarjo.save(self.cursor)
+
 class MetadataRecordTests(SQLiteTest):
 
     def test_fetch(self):

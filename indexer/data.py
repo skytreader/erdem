@@ -79,6 +79,10 @@ class SQLiteDataClass(ABC):
         pass
 
     def save(self, cursor) -> bool:
+        """
+        For this method, you need to have an UPDATE_QUERY in your class as well
+        as a corresponding proper override of create_update_tuple.
+        """
         try:
             cursor.execute(type(self).UPDATE_QUERY, self.create_update_tuple())
             return True
@@ -300,6 +304,16 @@ class PersonIndexRecord(SQLiteDataClass):
     extraction_rule: NameDecisionRule
     is_deactivated: int = 0
 
+    UPDATE_QUERY = """
+        UPDATE persons
+        SET firstname = ?,
+        lastname = ?,
+        extraction_rule = ?,
+        is_deactivated = ?
+        WHERE id = ?
+        LIMIT 1;
+    """
+
     @staticmethod
     def fetch(cursor, id) -> Optional["PersonIndexRecord"]:
         query = f"SELECT {starfields(PersonIndexRecord)} FROM persons WHERE id=? LIMIT 1"
@@ -355,7 +369,13 @@ class PersonIndexRecord(SQLiteDataClass):
         )
 
     def create_update_tuple(self) -> tuple[Any, ...]:
-        return tuple()
+        return (
+            self.firstname,
+            self.lastname,
+            str(self.extraction_rule),
+            self.is_deactivated,
+            self.id
+        )
 
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return tuple()

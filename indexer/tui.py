@@ -1,4 +1,6 @@
 from collections.abc import Callable
+from dataclasses import dataclass
+from enum import auto, Enum
 from sqlite3 import OperationalError
 from textual import on
 from textual.app import App, ComposeResult
@@ -11,7 +13,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 from textual import log
-from typing import Any, cast, Iterable, Optional
+from typing import Any, cast, Generic, Iterable, Optional, TypeVar
 
 import os
 import traceback
@@ -30,12 +32,35 @@ def error_string(ex: Exception) -> str:
         ''.join(traceback.format_exception(None, ex, ex.__traceback__)).strip()
     ])
 
+class CRUDAction(Enum):
+    CREATE = auto()
+    READ = auto()
+    UPDATE = auto()
+    DELETE = auto()
+
+T = TypeVar("T")
+
+@dataclass
+class CRUDActionResult(Generic[T]):
+    action: CRUDAction
+    record: T
+
 class ErdemScreen(Screen):
     BINDINGS = [("backspace", "app.pop_screen", "Back")]
 
     @property
     def erdem_app(self) -> "ErdemApp":
         return cast("ErdemApp", self.app)
+
+def _make_options_performers(performers: Iterable[PersonIndexRecord]) -> tuple[Option, ...]:
+        performer_options = []
+        for p in performers:
+            if p.id is None:
+                raise InvalidDataClassState(f"id is None for {p}")
+
+            performer_options.append(Option(str(p), id=str(p.id)))
+
+        return tuple(performer_options)
 
 class ErdemHomeScreen(ErdemScreen):
     TITLE = "Erdem"
@@ -85,7 +110,7 @@ class ErdemHomeScreen(ErdemScreen):
         - performer_count
         """
         self.shown_performers = OptionList(
-            *self.__make_options_performers(self.PERFORMERS), id="performers-list"
+            *_make_options_performers(self.PERFORMERS), id="performers-list"
         )
         self.shown_performers.styles.height = "30"
         self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
@@ -112,16 +137,6 @@ class ErdemHomeScreen(ErdemScreen):
             return f"Showing 1 {list_noun}."
         else:
             return f"Showing {count} {list_noun}s."
-
-    def __make_options_performers(self, performers: Iterable[PersonIndexRecord]) -> tuple[Option, ...]:
-        performer_options = []
-        for p in performers:
-            if p.id is None:
-                raise InvalidDataClassState(f"id is None for {p}")
-
-            performer_options.append(Option(str(p), id=str(p.id)))
-
-        return tuple(performer_options)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -187,7 +202,7 @@ class ErdemHomeScreen(ErdemScreen):
                 self.shown_performers.clear_options()
 
                 if search_results:
-                    self.shown_performers.add_options(self.__make_options_performers(search_results))
+                    self.shown_performers.add_options(_make_options_performers(search_results))
                 else:
                     self.shown_performers.add_option(ErdemHomeScreen.NO_RESULTS_FOUND)
 
@@ -199,7 +214,7 @@ class ErdemHomeScreen(ErdemScreen):
                 self.title_count.text = self.__make_count_label("title", len(self.TITLES))
             elif self.list_tabs.active == "performers-tab":
                 self.shown_performers.clear_options()
-                self.shown_performers.add_options(self.__make_options_performers(self.PERFORMERS))
+                self.shown_performers.add_options(_make_options_performers(self.PERFORMERS))
                 self.performer_count.text = self.__make_count_label("performer", len(self.PERFORMERS))
 
 class MediaView(ErdemScreen):
@@ -215,7 +230,15 @@ class MediaView(ErdemScreen):
                 self.erdem_app.index.conn.cursor(),
                 self.record
             )
-            self.performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
+            temp_performers = cast(tuple[Optional[PersonIndexRecord], ...], performers_result.performers if performers_result is not None else tuple())
+            self.performers: list[PersonIndexRecord] = [
+                tp for tp in temp_performers if tp is not None
+            ]
+            self.shown_performers = OptionList(
+                *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
+                id="performers-list",
+                classes="span3"
+            )
         else:
             self.error_str = f"Can't find performer with id {id}"
 
@@ -251,11 +274,7 @@ class MediaView(ErdemScreen):
                 Button("x", variant="warning", id="remove-performer", flat=True),
                 classes="span3"
             )
-            yield OptionList(
-                *tuple(Option(str(performer), id=str(performer.id)) for performer in self.performers if performer is not None),
-                id="performers-list",
-                classes="span3"
-            )
+            yield self.shown_performers
             ##############
             yield HorizontalGroup(
                 Label("Review:", classes="actionable-title"),
@@ -279,13 +298,28 @@ class MediaView(ErdemScreen):
     @on(OptionList.OptionSelected, "#performers-list")
     async def show_performer_modal(self, event: OptionList.OptionSelected) -> None:
         if event.option.id is not None:
-            self.erdem_app.push_screen(PerformerModal(int(event.option.id)))
+            self.erdem_app.push_screen(
+                PerformerModal(int(event.option.id)),
+                callback=self.__update_performer_list
+            )
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
     def __update_review(self, review: str):
         self.record.review = review
         cast(Markdown, self.query_one("#review")).update(review)
+
+    def __update_performer_list(self, action_result: CRUDActionResult):
+        if action_result.action == CRUDAction.UPDATE:
+            # First find the index of the updated record
+            idx = 0
+            for performer in self.performers:
+                if performer.id == action_result.record.id:
+                    break
+                idx += 1
+            self.performers[idx] = action_result.record
+            self.shown_performers.clear_options()
+            self.shown_performers.add_options(_make_options_performers(self.performers))
 
     @on(Button.Pressed, "#edit-review")
     async def show_edit_review_modal(self, event: Button.Pressed) -> None:
@@ -301,9 +335,9 @@ class MediaView(ErdemScreen):
     async def save_record(self, event: Button.Pressed) -> None:
         self.__update_record_model()
         if self.record.save(self.erdem_app.index.conn.cursor()):
-            self.erdem_app.notify("Record saved")
+            self.erdem_app.save_record_success()
         else:
-            self.erdem_app.notify("Failed to save record", severity="error")
+            self.erdem_app.save_record_failed()
         self.erdem_app.index.conn.commit()
 
 def performer_record_form(record: PersonIndexRecord, cursor, is_modal: bool) -> ComposeResult:
@@ -315,9 +349,9 @@ def performer_record_form(record: PersonIndexRecord, cursor, is_modal: bool) -> 
     )
     ###############################################
     yield Label("First name:", classes="span1")
-    yield GoodInput(classes="span2", value=f"{record.firstname}")
+    yield GoodInput(classes="span2", value=f"{record.firstname}", id="performer-firstname")
     yield Label("Last name:", classes="span1")
-    yield GoodInput(classes="span2", value=f"{record.lastname if record.lastname else ""}")
+    yield GoodInput(classes="span2", value=f"{record.lastname if record.lastname else ""}", id="performer-lastname")
     ###############################################
     if not is_modal:
         yield HorizontalGroup(
@@ -379,7 +413,7 @@ class PerformerView(ErdemScreen):
         self.title = "Erdem"
         self.sub_title = f"Performer Notes - {self.performer}"
 
-class PerformerModal(ModalScreen[PersonIndexRecord]):
+class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     CSS_PATH = "tcss/record-view.tcss"
     BINDINGS = [
         ("backspace", "close", "Close")
@@ -397,6 +431,21 @@ class PerformerModal(ModalScreen[PersonIndexRecord]):
                     self.parent_screen.erdem_app.cursor,
                     True
                 )
+
+    @on(Button.Pressed, "#save-record")
+    def action_save(self):
+        self.parent_screen.performer.firstname = self.query_one("#performer-firstname").value
+        self.parent_screen.performer.lastname = self.query_one("#performer-lastname").value
+        try:
+            self.parent_screen.performer.save(self.parent_screen.erdem_app.cursor)
+            self.parent_screen.erdem_app.index.conn.commit()
+            action_result = CRUDActionResult(
+                CRUDAction.UPDATE,
+                self.parent_screen.performer
+            )
+            self.dismiss(action_result)
+        except Exception:
+            self.parent_screen.erdem_app.save_record_failed()
 
     def action_close(self):
         self.app.pop_screen()
@@ -463,6 +512,12 @@ class ErdemApp(App):
 
     def on_mount(self) -> None:
         self.app.push_screen("home")
+
+    def save_record_failed(self) -> None:
+        self.notify("Failed to save record", severity="error")
+
+    def save_record_success(self) -> None:
+        self.notify("Record saved")
 
 app = ErdemApp()
 if __name__ == "__main__":
