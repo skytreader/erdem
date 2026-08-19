@@ -155,9 +155,13 @@ class PersonIndexRecordTests(SQLiteTest):
             NameDecisionRule.ALMOST_CERTAIN,
         )
         scarjo.insert(self.cursor)
-        fetch_scarjo = PersonIndexRecord.fetch(self.cursor, scarjo.id)
+        assert scarjo.firstname == "Scar"
         scarjo.firstname = "Scarlett"
+        scarjo.extraction_rule = NameDecisionRule.MANUAL_INPUT
         assert scarjo.save(self.cursor)
+        fetch_scarjo = PersonIndexRecord.fetch(self.cursor, scarjo.id)
+        assert fetch_scarjo.firstname == "Scarlett"
+        assert fetch_scarjo.extraction_rule == NameDecisionRule.MANUAL_INPUT
 
 class MetadataRecordTests(SQLiteTest):
 
