@@ -19,7 +19,12 @@ import os
 import traceback
 
 from .custom import Dynamic, GoodInput
-from .data import FileIndexRecord, PerformanceIndexRecord, PersonIndexRecord
+from .data import (
+    FileIndexRecord,
+    NameDecisionRule,
+    PerformanceIndexRecord,
+    PersonIndexRecord
+)
 from .indexerdem import Indexerdem, MetadataCheckResult
 from .errors import InvalidDataClassState
 
@@ -37,6 +42,7 @@ class CRUDAction(Enum):
     READ = auto()
     UPDATE = auto()
     DELETE = auto()
+    NOOP = auto()
 
 T = TypeVar("T")
 
@@ -414,6 +420,10 @@ class PerformerView(ErdemScreen):
         self.sub_title = f"Performer Notes - {self.performer}"
 
 class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
+    """
+    Should be basically the same as the full PerformerView but here the user can
+    only edit the performer's name.
+    """
     CSS_PATH = "tcss/record-view.tcss"
     BINDINGS = [
         ("backspace", "close", "Close")
@@ -422,6 +432,10 @@ class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     def __init__(self, performer_id: int):
         super().__init__()
         self.parent_screen = PerformerView(performer_id, True)
+        self.original_name = (
+            self.parent_screen.performer.firstname,
+            self.parent_screen.performer.lastname
+        )
 
     def compose(self) -> ComposeResult:
         with CenterMiddle(id="modal-container"):
@@ -436,16 +450,27 @@ class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     def action_save(self):
         self.parent_screen.performer.firstname = self.query_one("#performer-firstname").value
         self.parent_screen.performer.lastname = self.query_one("#performer-lastname").value
-        try:
-            self.parent_screen.performer.save(self.parent_screen.erdem_app.cursor)
-            self.parent_screen.erdem_app.index.conn.commit()
+        if self.original_name == (
+            self.parent_screen.performer.firstname,
+            self.parent_screen.performer.lastname
+        ):
+            self.parent_screen.performer.extraction_rule = NameDecisionRule.MANUAL_INPUT
+            try:
+                self.parent_screen.performer.save(self.parent_screen.erdem_app.cursor)
+                self.parent_screen.erdem_app.index.conn.commit()
+                action_result = CRUDActionResult(
+                    CRUDAction.UPDATE,
+                    self.parent_screen.performer
+                )
+                self.dismiss(action_result)
+            except Exception:
+                self.parent_screen.erdem_app.save_record_failed()
+        else:
             action_result = CRUDActionResult(
-                CRUDAction.UPDATE,
+                CRUDAction.NOOP,
                 self.parent_screen.performer
             )
             self.dismiss(action_result)
-        except Exception:
-            self.parent_screen.erdem_app.save_record_failed()
 
     def action_close(self):
         self.app.pop_screen()
