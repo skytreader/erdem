@@ -311,12 +311,13 @@ class MediaView(ErdemScreen):
         else:
             self.erdem_app.notify("No ID for given performer. Please check index", severity="warning")
 
-    def __update_review(self, review: str):
-        self.record.review = review
-        cast(Markdown, self.query_one("#review")).update(review)
+    def __update_review(self, review: Optional[str]):
+        if self.record and review:
+            self.record.review = review
+            cast(Markdown, self.query_one("#review")).update(review)
 
-    def __update_performer_list(self, action_result: CRUDActionResult):
-        if action_result.action == CRUDAction.UPDATE:
+    def __update_performer_list(self, action_result: Optional[CRUDActionResult[PersonIndexRecord]]) -> None:
+        if action_result and action_result.action == CRUDAction.UPDATE:
             # First find the index of the updated record
             idx = 0
             for performer in self.performers:
@@ -332,7 +333,7 @@ class MediaView(ErdemScreen):
         self.erdem_app.push_screen(
             EditMarkdownModal(
                 "Review",
-                self.record.review if self.record.review else ""
+                self.record.review if self.record and self.record.review else ""
             ),
             callback=self.__update_review
         )
@@ -340,7 +341,7 @@ class MediaView(ErdemScreen):
     @on(Button.Pressed, "#save-record")
     async def save_record(self, event: Button.Pressed) -> None:
         self.__update_record_model()
-        if self.record.save(self.erdem_app.index.conn.cursor()):
+        if self.record and self.record.save(self.erdem_app.index.conn.cursor()):
             self.erdem_app.save_record_success()
         else:
             self.erdem_app.save_record_failed()
@@ -432,10 +433,11 @@ class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     def __init__(self, performer_id: int):
         super().__init__()
         self.parent_screen = PerformerView(performer_id, True)
-        self.original_name = (
-            self.parent_screen.performer.firstname,
-            self.parent_screen.performer.lastname
-        )
+        if self.parent_screen.performer:
+            self.original_name = (
+                self.parent_screen.performer.firstname,
+                self.parent_screen.performer.lastname
+            )
 
     def compose(self) -> ComposeResult:
         with CenterMiddle(id="modal-container"):

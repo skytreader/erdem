@@ -395,8 +395,15 @@ class PerformanceIndexRecord(SQLiteDataClass):
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
     performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
 
+    # Intentionally blank because we have to set the query depending on how this
+    # instance is rooted.
+    UPDATE_QUERY = ""
+
     @dataclass
     class ExtraArgs:
+        """
+        Extra arguments for insertion. 
+        """
         certainties: tuple[int, ...]
 
         def __post_init__(self):

@@ -419,19 +419,20 @@ class Indexerdem(object):
         result = cursor.execute(query, (id,)).fetchone()
         return FileIndexRecord(*result) if result is not None else None
     
-    def fetch_persons(self, activity_status: Optional[bool] = None) -> tuple[PersonIndexRecord, ...]:
+    def fetch_persons(self, is_deactivated: Optional[bool] = None) -> tuple[PersonIndexRecord, ...]:
         cursor = self.conn.cursor()
         all_fields = starfields(PersonIndexRecord)
         query = (
             f"SELECT {all_fields} FROM persons WHERE is_deactivated=?"
-            if activity_status is not None else
+            if is_deactivated is not None else
             f"SELECT {all_fields} FROM persons"
         )
         return tuple(
             PersonIndexRecord.from_sqlite_record(cursor, row) for row in
             cursor.execute(
                 query,
-                (self.__sqliteify(activity_status),)
+                # here we value cleverness and conciseness over type safety
+                (self.__sqliteify(is_deactivated),) # type: ignore
             ).fetchall()
         )
     
