@@ -1,7 +1,6 @@
 from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
-from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from typing import Any, cast, ClassVar, Iterable, Optional, List, Set, Tuple, Union
@@ -388,6 +387,9 @@ class PerformanceIndexRecord(SQLiteDataClass):
     a tuple of FileIndexRecords and PersonIndexRecords respectively or just a
     plain instance of those given types.
 
+    We use the root-and-branches terminology here to describe the exclusively 
+    one-to-many relationship represented by this class.
+
     An instance of this class is said to be _rooted_ if and only if one of the
     two fields is plain non-tuple instance while the other is a tuple.
     Furthermore, the record is said to be _rooted at_ the non-tuple field.
@@ -396,11 +398,15 @@ class PerformanceIndexRecord(SQLiteDataClass):
     """
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
-    files_original: Union[FileIndexRecord, tuple[FileIndexRecord]] = field(init=False)
     performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
-    performers_original: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]] = field(init=False)
     certainties: tuple[int, ...]
     certainties_original: tuple[int, ...] = field(init=False)
+
+    # Invariant: added_branches and added_certainties are parallel arrays.
+    added_branches: Union[list[FileIndexRecord], list[PersonIndexRecord]] = field(init=False)
+    added_certainties: list[int] = field(init=False)
+
+    deleted_branches: Union[list[FileIndexRecord], list[PersonIndexRecord]] = field(init=False)
 
     # Intentionally blank because we have to set the query depending on how this
     # instance is rooted.
@@ -409,6 +415,28 @@ class PerformanceIndexRecord(SQLiteDataClass):
     def __post_init__(self):
         for c in self.certainties:
             assert c == 0 or c == 1
+
+        self.added_branches = []
+        self.added_certainties = []
+        self.deleted_branches = []
+
+    @property
+    def all_performers(self) -> Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]:
+        if self.__is_person_rooted():
+            return self.performers
+        else:
+            all_performers = [p for p in cast(list[PersonIndexRecord], self.added_branches)]
+            all_performers.extend(cast(tuple[PersonIndexRecord], self.performers))
+            return tuple(all_performers)
+
+    @property
+    def all_files(self) -> Union[FileIndexRecord, tuple[FileIndexRecord, ...]]:
+        if self.__is_performance_rooted():
+            return self.files
+        else:
+            all_files = [f for f in cast(list[FileIndexRecord], self.files)]
+            all_files.extend(cast(tuple[FileIndexRecord], self.files))
+            return tuple(all_files)
 
     def __is_person_rooted(self) -> bool:
         return (
@@ -435,24 +463,39 @@ class PerformanceIndexRecord(SQLiteDataClass):
         non_root_attr = tuple() if result is None else tuple([non_root_type.fetch(cursor, _id[0]) for _id in result if _id is not None])
         certainties = tuple() if result is None else tuple([r[1] for r in result if r is not None])
         
-        if is_person_rooted:
-            return PerformanceIndexRecord(files=non_root_attr, performers=cast(PersonIndexRecord, root_record), certainties=certainties) # type: ignore
-        else:
-            return PerformanceIndexRecord(files=cast(FileIndexRecord, root_record), performers=non_root_attr, certainties=certainties) # type: ignore
+        if non_root_attr is not None:
+            if is_person_rooted:
+                return PerformanceIndexRecord(
+                    files=non_root_attr, # type: ignore
+                    performers=cast(PersonIndexRecord, root_record),
+                    certainties=certainties
+                )
+            else:
+                return PerformanceIndexRecord(
+                    files=cast(FileIndexRecord, root_record),
+                    performers=non_root_attr, # type: ignore
+                    certainties=certainties
+                )
 
-    def add_performers(self, performers: Iterable[PersonIndexRecord], certainty: int): 
+    def add_performers(self, performers: Iterable[PersonIndexRecord], certainties: list[int]): 
+        for certainty in certainties:
+            if certainty != 0 or certainty != 1:
+                raise ValueError("certainty must either be 0 or 1")
+
         if self.__is_performance_rooted():
-            new_list = list(cast(tuple[PersonIndexRecord, ...], self.performers))
-            new_list.extend(performers)
-            self.performers = tuple(new_list)
+            self.added_branches.extend(performers)
+            self.added_certainties.extend(certainties)
         else:
             raise InvalidDataClassState("Object must be performance rooted to add performers.")
 
-    def add_performances(self, performances: Iterable[FileIndexRecord], certainty: int):
+    def add_files(self, files: Iterable[FileIndexRecord], certainties: list[int]):
+        for certainty in certainties:
+            if certainty != 0 or certainty != 1:
+                raise ValueError("certainty must either be 0 or 1")
+
         if self.__is_person_rooted():
-            new_list = list(cast(tuple[FileIndexRecord, ...], self.files))
-            new_list.extend(performances)
-            self.files = tuple(new_list)
+            self.added_branches.extend(files)
+            self.added_certainties.extend(certainties)
         else:
             raise InvalidDataClassState("Object must be performer rooted to add performances.")
 
@@ -533,6 +576,8 @@ class PerformanceIndexRecord(SQLiteDataClass):
             update_statement = """
                 UPDATE participation
             """
+
+        return False
 
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return tuple()
