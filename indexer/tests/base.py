@@ -23,9 +23,9 @@ class SQLiteTest(unittest.TestCase):
     def connection(self):
         return self.indexerdem.conn
 
-    def insert(self, constructor, *args, insert_extra_args: Optional[Any]=None):
+    def insert(self, constructor, *args):
         obj = constructor(*args)
-        obj.insert(self.cursor, insert_extra_args)
+        obj.insert(self.cursor)
         return obj
 
     def setUp(self):

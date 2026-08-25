@@ -1,6 +1,7 @@
 from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from typing import Any, cast, ClassVar, Iterable, Optional, List, Set, Tuple, Union
@@ -52,7 +53,7 @@ class SQLiteDataClass(ABC):
         pass
     
     @abstractmethod
-    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         """
         Insert this record into the database. Return the id or, for composite
         records, the number of inserted rows.
@@ -157,7 +158,7 @@ class MetadataRecord(SQLiteDataClass):
     def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "MetadataRecord":
         raise ConstructorPreferred()
     
-    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         """
         Since there is no integer id for this table, this only returns either 1
         or 0 for a successful and unsuccessful insertion respectively.
@@ -213,7 +214,7 @@ class MountpointRecord(SQLiteDataClass):
             record.insert(cursor)
             return record
 
-    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         cursor.execute(
             f"INSERT INTO mountpoints ({starfields(MountpointRecord, True)}) VALUES (?)",
             (self.path,)
@@ -272,7 +273,7 @@ class FileIndexRecord(SQLiteDataClass):
         else:
             raise ValueError(f"Can't find provided mountpoint in record: {record}")
 
-    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         cursor.execute(
             f"INSERT INTO files ({starfields(FileIndexRecord, True, FileIndexRecord.COL_MAPPING)}) VALUES (?, ?, ?, ?, ?)",
             (self.mountpoint.id, self.filename, self.fullpath, self.review, self.rating)
@@ -324,7 +325,7 @@ class PersonIndexRecord(SQLiteDataClass):
     def from_sqlite_record(cursor, record: tuple[int, str, str, str, int]) -> "PersonIndexRecord":
         return PersonIndexRecord(record[0], record[1], record[2], NameDecisionRule(record[3]), record[4])
 
-    def insert(self, cursor, extra_args: Optional[Any] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         cursor.execute(
             """INSERT INTO persons (firstname, lastname, extraction_rule, is_deactivated)
             VALUES(?, ?, ?, ?)""",
@@ -390,25 +391,24 @@ class PerformanceIndexRecord(SQLiteDataClass):
     An instance of this class is said to be _rooted_ if and only if one of the
     two fields is plain non-tuple instance while the other is a tuple.
     Furthermore, the record is said to be _rooted at_ the non-tuple field.
+
+    The root of an instance can never change.
     """
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
+    files_original: Union[FileIndexRecord, tuple[FileIndexRecord]] = field(init=False)
     performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
+    performers_original: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]] = field(init=False)
+    certainties: tuple[int, ...]
+    certainties_original: tuple[int, ...] = field(init=False)
 
     # Intentionally blank because we have to set the query depending on how this
     # instance is rooted.
     UPDATE_QUERY = ""
 
-    @dataclass
-    class ExtraArgs:
-        """
-        Extra arguments for insertion. 
-        """
-        certainties: tuple[int, ...]
-
-        def __post_init__(self):
-            for c in self.certainties:
-                assert c == 0 or c == 1
+    def __post_init__(self):
+        for c in self.certainties:
+            assert c == 0 or c == 1
 
     def __is_person_rooted(self) -> bool:
         return (
@@ -426,20 +426,21 @@ class PerformanceIndexRecord(SQLiteDataClass):
     def fetch(cursor, root_record: Union[PersonIndexRecord, FileIndexRecord]) -> Optional["PerformanceIndexRecord"]:
         is_person_rooted = isinstance(root_record, PersonIndexRecord)
         query = (
-            f"SELECT file_id FROM participation WHERE person_id={root_record.id}"
+            f"SELECT file_id,is_certain FROM participation WHERE person_id={root_record.id}"
             if is_person_rooted else
-            f"SELECT person_id FROM participation WHERE file_id={root_record.id}"
+            f"SELECT person_id,is_certain FROM participation WHERE file_id={root_record.id}"
         )
         result = cursor.execute(query).fetchall()
         non_root_type = FileIndexRecord if is_person_rooted else PersonIndexRecord
         non_root_attr = tuple() if result is None else tuple([non_root_type.fetch(cursor, _id[0]) for _id in result if _id is not None])
+        certainties = tuple() if result is None else tuple([r[1] for r in result if r is not None])
         
         if is_person_rooted:
-            return PerformanceIndexRecord(files=non_root_attr, performers=cast(PersonIndexRecord, root_record)) # type: ignore
+            return PerformanceIndexRecord(files=non_root_attr, performers=cast(PersonIndexRecord, root_record), certainties=certainties) # type: ignore
         else:
-            return PerformanceIndexRecord(files=cast(FileIndexRecord, root_record), performers=non_root_attr) # type: ignore
+            return PerformanceIndexRecord(files=cast(FileIndexRecord, root_record), performers=non_root_attr, certainties=certainties) # type: ignore
 
-    def add_performers(self, performers: Iterable[PersonIndexRecord]): 
+    def add_performers(self, performers: Iterable[PersonIndexRecord], certainty: int): 
         if self.__is_performance_rooted():
             new_list = list(cast(tuple[PersonIndexRecord, ...], self.performers))
             new_list.extend(performers)
@@ -447,7 +448,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
         else:
             raise InvalidDataClassState("Object must be performance rooted to add performers.")
 
-    def add_performances(self, performances: Iterable[FileIndexRecord]):
+    def add_performances(self, performances: Iterable[FileIndexRecord], certainty: int):
         if self.__is_person_rooted():
             new_list = list(cast(tuple[FileIndexRecord, ...], self.files))
             new_list.extend(performances)
@@ -459,15 +460,12 @@ class PerformanceIndexRecord(SQLiteDataClass):
     def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
 
-    def insert(self, cursor, extra_args: Optional["PerformanceIndexRecord.ExtraArgs"] = None) -> Optional[int]:
+    def insert(self, cursor) -> Optional[int]:
         """
         To insert a plain one-to-one relationship between performance and
         performer, just root the record in either field and then make a
         singleton tuple for the other field.
         """
-        if extra_args is None:
-            raise ValueError("extra_args can't be None")
-
         if isinstance(self.files, tuple) and isinstance(self.performers, tuple):
             raise InvalidDataClassState("record is not rooted, both files and performers are collections")
         query = """
@@ -478,7 +476,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             # self.files is root
             root_val = cast(FileIndexRecord, self.files)
             self.performers = cast(tuple[PersonIndexRecord, ...], self.performers)
-            if len(self.performers) != len(extra_args.certainties):
+            if len(self.performers) != len(self.certainties):
                 raise ValueError("performers and certainties are not the same length")
 
             if root_val.id is None:
@@ -487,7 +485,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             root_val.id = cast(int, root_val.id)
             temp_tuples = []
 
-            for p, c in zip(self.performers, extra_args.certainties):
+            for p, c in zip(self.performers, self.certainties):
                 if p.id is None:
                     p.insert(cursor)
             
@@ -499,7 +497,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             # self.performers is root
             root_performer = cast(PersonIndexRecord, self.performers)
             self.files = cast(tuple[FileIndexRecord, ...], self.files)
-            if len(self.files) != len(extra_args.certainties):
+            if len(self.files) != len(self.certainties):
                 raise ValueError("files and certainties are not the same length")
 
             if root_performer.id is None:
@@ -508,7 +506,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             root_performer.id = cast(int, root_performer.id)
             temp_tuples = []
 
-            for f, c in zip(self.files, extra_args.certainties):
+            for f, c in zip(self.files, self.certainties):
                 if f.id is None:
                     f.insert(cursor)
 
@@ -525,6 +523,16 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
     def create_update_tuple(self) -> tuple[Any, ...]:
         return tuple()
+    
+    def save(self, cursor) -> bool:
+        """
+        Note that this might effectively issue deletes if relationships were 
+        """
+        # TODO Maybe we should enclose this in a transaction
+        if self.__is_person_rooted():
+            update_statement = """
+                UPDATE participation
+            """
 
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return tuple()

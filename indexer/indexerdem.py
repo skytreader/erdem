@@ -361,13 +361,11 @@ class Indexerdem(object):
                 if file_record is not None:
                     perf_record = PerformanceIndexRecord(
                         files=file_record,
-                        performers=tuple(spam for spam in (PersonIndexRecord.fetch(cursor, pid) for pid in persons) if spam is not None)
+                        performers=tuple(spam for spam in (PersonIndexRecord.fetch(cursor, pid) for pid in persons) if spam is not None),
+                        certainties=tuple(certainties)
                     )
                     try:
-                        perf_record.insert(
-                            cursor,
-                            PerformanceIndexRecord.ExtraArgs(certainties=tuple(certainties))
-                        )
+                        perf_record.insert(cursor)
                     except sqlite3.IntegrityError:
                         logger.warn(f"Some persons are already associated with {file_record}")
                     return file_record

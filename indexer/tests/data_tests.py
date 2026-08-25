@@ -217,13 +217,13 @@ class PerformanceIndexRecordTests(SQLiteTest):
             PerformanceIndexRecord,
             self.p_and_r,
             tuple([self.jslate]),
-            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+            tuple([1])
         )
         self.ee_perf = self.insert(
             PerformanceIndexRecord,
             self.everything_everywhere,
             tuple([self.jslate, self.myeoh]),
-            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1, 1]))
+            tuple([1, 1])
         )
 
         self.zendaya = self.insert(
@@ -239,7 +239,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             PerformanceIndexRecord,
             self.dune,
             tuple([self.zendaya]),
-            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+            tuple([1])
         )
 
         self.spiderman = self.insert(
@@ -255,7 +255,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             PerformanceIndexRecord,
             tuple([self.spiderman]),
             self.zendaya,
-            insert_extra_args=PerformanceIndexRecord.ExtraArgs(tuple([1]))
+            tuple([1])
         )
 
     def test_create(self):
