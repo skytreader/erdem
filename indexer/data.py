@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
 from typing import Any, cast, ClassVar, Iterable, Optional, List, Set, Tuple, Union
+from typing_extensions import override
 
 class NameDecisionRule(StrEnum):
     ALMOST_CERTAIN = "almost-certain"
@@ -148,15 +149,18 @@ class MetadataRecord(SQLiteDataClass):
     """
 
     @staticmethod
+    @override
     def fetch(cursor, id: str) -> Optional["MetadataRecord"]:
         query = "SELECT key, val FROM __metadata WHERE key=? LIMIT 1"
         result = cursor.execute(query, (id,)).fetchone()
         return MetadataRecord(*result) if result is not None else None
 
     @staticmethod
+    @override
     def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "MetadataRecord":
         raise ConstructorPreferred()
     
+    @override
     def insert(self, cursor) -> Optional[int]:
         """
         Since there is no integer id for this table, this only returns either 1
@@ -171,9 +175,11 @@ class MetadataRecord(SQLiteDataClass):
         except:
             return 0
 
+    @override
     def create_update_tuple(self) -> tuple[Any, ...]:
         return (self.key, self.val, self.key)
 
+    @override
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return (self.key,)
 
@@ -398,7 +404,18 @@ class PerformanceIndexRecord(SQLiteDataClass):
     """
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
+    """
+    This represents the files in this relationship persisted in the DB. To get
+    all the files currently saved in this object, use the property `all_files`.
+    """
+
     performers: Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]
+    """
+    This represents all the performers in this relationship persisted in the DB.
+    To get all the performers saved in this object, use the property
+    `all_performers`.
+    """
+
     certainties: tuple[int, ...]
     certainties_original: tuple[int, ...] = field(init=False)
 
@@ -483,6 +500,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 raise ValueError("certainty must either be 0 or 1")
 
         if self.__is_performance_rooted():
+            self.added_branches = cast(list[PersonIndexRecord], self.added_branches)
             self.added_branches.extend(performers)
             self.added_certainties.extend(certainties)
         else:
@@ -494,15 +512,18 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 raise ValueError("certainty must either be 0 or 1")
 
         if self.__is_person_rooted():
+            self.added_branches = cast(list[FileIndexRecord], self.added_branches)
             self.added_branches.extend(files)
             self.added_certainties.extend(certainties)
         else:
             raise InvalidDataClassState("Object must be performer rooted to add performances.")
 
     @staticmethod
+    @override
     def from_sqlite_record(cursor, record: tuple[Any, ...]) -> "PerformanceIndexRecord":
         raise ConstructorPreferred()
 
+    @override
     def insert(self, cursor) -> Optional[int]:
         """
         To insert a plain one-to-one relationship between performance and
@@ -564,9 +585,11 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
         return cursor.lastrowid
 
+    @override
     def create_update_tuple(self) -> tuple[Any, ...]:
         return tuple()
     
+    @override
     def save(self, cursor) -> bool:
         """
         Note that this might effectively issue deletes if relationships were 
@@ -579,5 +602,6 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
         return False
 
+    @override
     def create_delete_tuple(self) -> tuple[Any, ...]:
         return tuple()
