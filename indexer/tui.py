@@ -420,6 +420,10 @@ class PerformerView(ErdemScreen):
         self.title = "Erdem"
         self.sub_title = f"Performer Notes - {self.performer}"
 
+    def __update_record_model(self) -> None:
+        self.performer.firstname = self.query_one("#performer-firstname").value
+        self.performer.lastname = self.query_one("#performer-lastname").value
+
 class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     """
     Should be basically the same as the full PerformerView but here the user can
@@ -452,7 +456,7 @@ class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     def action_save(self):
         self.parent_screen.performer.firstname = self.query_one("#performer-firstname").value
         self.parent_screen.performer.lastname = self.query_one("#performer-lastname").value
-        if self.original_name == (
+        if self.original_name != (
             self.parent_screen.performer.firstname,
             self.parent_screen.performer.lastname
         ):
@@ -464,6 +468,7 @@ class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
                     CRUDAction.UPDATE,
                     self.parent_screen.performer
                 )
+                self.parent_screen.erdem_app.save_record_success()
                 self.dismiss(action_result)
             except Exception:
                 self.parent_screen.erdem_app.save_record_failed()
