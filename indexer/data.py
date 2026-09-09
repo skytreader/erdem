@@ -592,12 +592,38 @@ class PerformanceIndexRecord(SQLiteDataClass):
     @override
     def save(self, cursor) -> bool:
         """
-        Note that this might effectively issue deletes if relationships were 
+        Note that this might effectively issue deletes if branches were pruned
+        as well as inserts if branches were added.
         """
         # TODO Maybe we should enclose this in a transaction
         if self.__is_person_rooted():
-            update_statement = """
+            # Handle deletes first
+            delete_stmt_tmp = """
+                DELETE FROM participation
+                WHERE person_id = ?
+                AND file_id in (%s);
+            """
+            delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
+            delete_vals = [b.id for b in self.deleted_branches]
+            delete_vals.insert(0, self.performers.id)
+            cursor.execute(delete_stmt, delete_vals)
+
+            # Handle insertions next
+            insert_stmt_tmp = """
+                INSERT INTO participation (person_id, file_id, certainty)
+                VALUES %S;
+            """
+            insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
+            insert_vals = (
+                (self.performers.id, f.id, cert)
+                for f, cert in zip(self.added_branches, self.added_certainties)
+            )
+            cursor.execute(insert_stmt, insert_vals)
+
+            # Bulk update last
+            update_stmt_tmp = """
                 UPDATE participation
+                SET f
             """
 
         return False
