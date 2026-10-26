@@ -8,6 +8,7 @@ from ..data import (
     starfields
 )
 from ..indexerdem import NameDecisionRule
+from ..errors import InvalidDataClassState
 
 import pytest
 
@@ -262,6 +263,14 @@ class PerformanceIndexRecordTests(SQLiteTest):
         assert self.p_and_r_perf.files == self.p_and_r
         assert len(self.p_and_r_perf.performers) == 1
         assert self.jslate in self.p_and_r_perf.performers
+
+    def test_add_performers_ex(self):
+        with pytest.raises(InvalidDataClassState):
+            self.spiderman_perf.add_performers((self.jslate,), (1,))
+
+    def test_add_files_ex(self):
+        with pytest.raises(InvalidDataClassState):
+            self.dune_perf.add_files((self.spiderman,), (1,))
     
     def test_fetch(self):
         # Fetch with a performer

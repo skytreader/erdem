@@ -494,10 +494,10 @@ class PerformanceIndexRecord(SQLiteDataClass):
                     certainties=certainties
                 )
 
-    def add_performers(self, performers: Iterable[PersonIndexRecord], certainties: list[int]): 
+    def add_performers(self, performers: Iterable[PersonIndexRecord], certainties: Iterable[int]): 
         for certainty in certainties:
-            if certainty != 0 or certainty != 1:
-                raise ValueError("certainty must either be 0 or 1")
+            if certainty != 0 and certainty != 1:
+                raise ValueError(f"certainty must either be 0 or 1 given {certainty}")
 
         if self.__is_performance_rooted():
             self.added_branches = cast(list[PersonIndexRecord], self.added_branches)
@@ -506,10 +506,10 @@ class PerformanceIndexRecord(SQLiteDataClass):
         else:
             raise InvalidDataClassState("Object must be performance rooted to add performers.")
 
-    def add_files(self, files: Iterable[FileIndexRecord], certainties: list[int]):
+    def add_files(self, files: Iterable[FileIndexRecord], certainties: Iterable[int]):
         for certainty in certainties:
-            if certainty != 0 or certainty != 1:
-                raise ValueError("certainty must either be 0 or 1")
+            if certainty != 0 and certainty != 1:
+                raise ValueError(f"certainty must either be 0 or 1 given {certainty}")
 
         if self.__is_person_rooted():
             self.added_branches = cast(list[FileIndexRecord], self.added_branches)
@@ -597,6 +597,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
         """
         # TODO Maybe we should enclose this in a transaction
         if self.__is_person_rooted():
+            performer = cast(PersonIndexRecord, self.performers)
             # Handle deletes first
             delete_stmt_tmp = """
                 DELETE FROM participation
@@ -605,7 +606,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
             """
             delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
             delete_vals = [b.id for b in self.deleted_branches]
-            delete_vals.insert(0, self.performers.id)
+            delete_vals.insert(0, performer.id)
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
@@ -615,16 +616,66 @@ class PerformanceIndexRecord(SQLiteDataClass):
             """
             insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
             insert_vals = (
-                (self.performers.id, f.id, cert)
-                for f, cert in zip(self.added_branches, self.added_certainties)
+                (performer.id, file.id, cert)
+                for file, cert in zip(cast(list[FileIndexRecord], self.added_branches), self.added_certainties)
             )
             cursor.execute(insert_stmt, insert_vals)
 
             # Bulk update last
             update_stmt_tmp = """
                 UPDATE participation
-                SET f
+                SET file_id=?
+                WHERE person_id=?
+                LIMIT 1;
             """
+            cursor.execute(
+                update_stmt_tmp,
+                (
+                    (performer.id, file.id, cert)
+                    for file, cert in zip(cast(tuple[FileIndexRecord], self.files), self.certainties)
+                )
+            )
+            return True
+        else:
+            file = cast(FileIndexRecord, self.files)
+            # Handle deletes first
+            delete_stmt_tmp = """
+                DELETE FROM participation
+                WHERE file_id = ?
+                AND person_id in (%s);
+            """
+            delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
+            delete_vals = [b.id for b in self.deleted_branches]
+            delete_vals.insert(0, file.id)
+            cursor.execute(delete_stmt, delete_vals)
+
+            # Handle insertions next
+            insert_stmt_tmp = """
+                INSERT INTO participation (person_id, file_id, certainty)
+                VALUES %S;
+            """
+            insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
+            insert_vals = (
+                (performer.id, file.id, cert)
+                for performer, cert in zip(cast(list[PersonIndexRecord], self.added_branches), self.added_certainties)
+            )
+            cursor.execute(insert_stmt, insert_vals)
+
+            # Bulk update last
+            update_stmt_tmp = """
+                UPDATE participation
+                SET person_id=?
+                WHERE file_id=?
+                LIMIT 1;
+            """
+            cursor.execute(
+                update_stmt_tmp,
+                (
+                    (performer.id, file.id, cert)
+                    for performer, cert in zip(cast(tuple[PersonIndexRecord], self.performers), self.certainties)
+                )
+            )
+            return True
 
         return False
 

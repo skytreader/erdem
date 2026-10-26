@@ -421,8 +421,9 @@ class PerformerView(ErdemScreen):
         self.sub_title = f"Performer Notes - {self.performer}"
 
     def __update_record_model(self) -> None:
-        self.performer.firstname = self.query_one("#performer-firstname").value
-        self.performer.lastname = self.query_one("#performer-lastname").value
+        if self.performer:
+            self.performer.firstname = cast(GoodInput, self.query_one("#performer-firstname")).value
+            self.performer.lastname = cast(GoodInput, self.query_one("#performer-lastname")).value
 
 class PerformerModal(ModalScreen[CRUDActionResult[PersonIndexRecord]]):
     """
