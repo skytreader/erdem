@@ -423,7 +423,10 @@ class PerformanceIndexRecord(SQLiteDataClass):
     added_branches: Union[list[FileIndexRecord], list[PersonIndexRecord]] = field(init=False)
     added_certainties: list[int] = field(init=False)
 
-    deleted_branches: Union[list[FileIndexRecord], list[PersonIndexRecord]] = field(init=False)
+    deleted_branches: set[int] = field(init=False)
+    """
+    Represents indices in the branch field which should count as deleted.
+    """
 
     # Intentionally blank because we have to set the query depending on how this
     # instance is rooted.
@@ -435,25 +438,46 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
         self.added_branches = []
         self.added_certainties = []
-        self.deleted_branches = []
+        self.deleted_branches = set()
 
     @property
     def all_performers(self) -> Union[PersonIndexRecord, tuple[PersonIndexRecord, ...]]:
         if self.__is_person_rooted():
             return self.performers
         else:
-            all_performers = [p for p in cast(list[PersonIndexRecord], self.added_branches)]
-            all_performers.extend(cast(tuple[PersonIndexRecord], self.performers))
-            return tuple(all_performers)
+            new_performers = [p for p in cast(list[PersonIndexRecord], self.added_branches)]
+            original_performers = [
+                p for idx, p in enumerate(cast(tuple[PersonIndexRecord, ...], self.performers))
+                if idx not in self.deleted_branches
+            ]
+            new_performers.extend(original_performers)
+            return tuple(new_performers)
 
     @property
     def all_files(self) -> Union[FileIndexRecord, tuple[FileIndexRecord, ...]]:
         if self.__is_performance_rooted():
             return self.files
         else:
-            all_files = [f for f in cast(list[FileIndexRecord], self.files)]
-            all_files.extend(cast(tuple[FileIndexRecord], self.files))
-            return tuple(all_files)
+            new_files = [f for f in cast(list[FileIndexRecord], self.added_branches)]
+            original_files = [
+                f for idx, f in enumerate(cast(tuple[FileIndexRecord, ...], self.files))
+                if idx not in self.deleted_branches
+            ]
+            new_files.extend(original_files)
+            return tuple(new_files)
+
+    @property
+    def deleted_values(self) -> Union[tuple[FileIndexRecord, ...], tuple[PersonIndexRecord, ...]]:
+        if self.__is_person_rooted():
+            self.files = cast(tuple[FileIndexRecord, ...], self.files)
+            return tuple([
+                self.files[idx] for idx in self.deleted_branches
+            ])
+        else:
+            self.performers = cast(tuple[PersonIndexRecord, ...], self.performers)
+            return tuple([
+                self.performers[idx] for idx in self.deleted_branches
+            ])
 
     def __is_person_rooted(self) -> bool:
         return (
@@ -605,8 +629,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 AND file_id in (%s);
             """
             delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
-            delete_vals = [b.id for b in self.deleted_branches]
-            delete_vals.insert(0, performer.id)
+            delete_vals = [record.id for record in cast(tuple[FileIndexRecord, ...], self.deleted_values)]
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
@@ -645,8 +668,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 AND person_id in (%s);
             """
             delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
-            delete_vals = [b.id for b in self.deleted_branches]
-            delete_vals.insert(0, file.id)
+            delete_vals = [record.id for record in cast(tuple[PersonIndexRecord, ...], self.deleted_values)]
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next

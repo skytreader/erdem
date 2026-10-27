@@ -177,6 +177,15 @@ class MetadataRecordTests(SQLiteTest):
         assert MetadataRecord.fetch(self.cursor, "index_version") is None
 
 class PerformanceIndexRecordTests(SQLiteTest):
+    """
+    Naming convention for test fields for PerformanceIndexRecords:
+
+    {root}_perf_{default branches}
+
+    - {root} is the foreign key record entity on which this record is rooted
+    - {default branches} is a collective description of the branch records in
+      this relationship.
+    """
 
     def setUp(self):
         super().setUp()
@@ -252,7 +261,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             "",
             0
         )
-        self.spiderman_perf = self.insert(
+        self.zendaya_perf_spiderman = self.insert(
             PerformanceIndexRecord,
             tuple([self.spiderman]),
             self.zendaya,
@@ -266,7 +275,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
 
     def test_add_performers_ex(self):
         with pytest.raises(InvalidDataClassState):
-            self.spiderman_perf.add_performers((self.jslate,), (1,))
+            self.zendaya_perf_spiderman.add_performers((self.jslate,), (1,))
 
     def test_add_files_ex(self):
         with pytest.raises(InvalidDataClassState):
