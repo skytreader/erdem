@@ -630,6 +630,12 @@ class PerformanceIndexRecord(SQLiteDataClass):
             """
             delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
             delete_vals = [record.id for record in cast(tuple[FileIndexRecord, ...], self.deleted_values)]
+            # actually prune the branches now
+            remaining_file_branches = tuple(
+                record for record in cast(tuple[FileIndexRecord, ...], self.files)
+                if record not in cast(tuple[FileIndexRecord, ...], self.deleted_values)
+            )
+            self.files = remaining_file_branches
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
@@ -669,6 +675,12 @@ class PerformanceIndexRecord(SQLiteDataClass):
             """
             delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
             delete_vals = [record.id for record in cast(tuple[PersonIndexRecord, ...], self.deleted_values)]
+            # actually prune branches now
+            remaining_performer_branches = tuple(
+                record for record in cast(tuple[PersonIndexRecord, ...], self.performers)
+                if record not in cast(tuple[PersonIndexRecord, ...], self.deleted_values)
+            )
+            self.performers = remaining_performer_branches
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
