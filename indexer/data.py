@@ -199,6 +199,9 @@ class MountpointRecord(SQLiteDataClass):
         LIMIT 1;
     """
 
+    def __eq__(self, other: Any) -> bool:
+        return self.path == other.path
+
     @staticmethod
     def fetch(cursor, id: int) -> Optional["MountpointRecord"]:
         query = f"SELECT {starfields(MountpointRecord)} FROM mountpoints WHERE id=? LIMIT 1"
@@ -256,6 +259,16 @@ class FileIndexRecord(SQLiteDataClass):
         WHERE id = ?
         LIMIT 1;
     """
+
+    def __eq__(self, other: Any) -> bool:
+        return all(
+            (
+                self.mountpoint == other.mountpoint,
+                self.filename == other.filename,
+                self.review == other.review,
+                self.rating == other.rating
+            )
+        )
 
     def __post_init__(self):
         if self.rating is None:
@@ -319,6 +332,16 @@ class PersonIndexRecord(SQLiteDataClass):
         WHERE id = ?
         LIMIT 1;
     """
+
+    def __eq__(self, other: Any) -> bool:
+        return all(
+            (
+                self.firstname == other.firstname,
+                self.lastname == other.lastname,
+                self.extraction_rule == other.extraction_rule,
+                self.is_deactivated == other.is_deactivated
+            )
+        )
 
     @staticmethod
     def fetch(cursor, id) -> Optional["PersonIndexRecord"]:

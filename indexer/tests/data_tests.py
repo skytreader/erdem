@@ -106,6 +106,21 @@ class FileIndexRecordTests(SQLiteTest):
 
 class PersonIndexRecordTests(SQLiteTest):
 
+    def test_eq(self):
+        tinafey1 = PersonIndexRecord(
+            1,
+            "Tina",
+            "Fey",
+            NameDecisionRule.ALMOST_CERTAIN
+        )
+        tinafey2 = PersonIndexRecord(
+            None,
+            "Tina",
+            "Fey",
+            NameDecisionRule.ALMOST_CERTAIN
+        )
+        assert tinafey1 == tinafey2
+
     def test_fetch(self):
         scarjo = PersonIndexRecord(
             None,
