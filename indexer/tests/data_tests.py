@@ -4,8 +4,8 @@ from unittest import mock
 from .base import SQLiteTest, TestException
 
 from ..data import (
-    FileIndexRecord, MetadataRecord, PerformanceIndexRecord, PersonIndexRecord,
-    starfields
+    FileIndexRecord, MetadataRecord, MountpointRecord, PerformanceIndexRecord,
+    PersonIndexRecord, starfields
 )
 from ..indexerdem import NameDecisionRule
 from ..errors import InvalidDataClassState
@@ -27,7 +27,19 @@ def test_starfields():
         {"firstname": "first_name", "lastname": "ln"}
     ) == "first_name,ln"
 
+class MountpointRecordTests(SQLiteTest):
+
+    def test_eq(self):
+        mp1 = MountpointRecord(None, "/")
+        mp2 = MountpointRecord(2, "/")
+        assert mp1 == mp2
+
 class FileIndexRecordTests(SQLiteTest):
+
+    def test_eq(self):
+        file_record = FileIndexRecord(None, self.default_mountpoint, "test", "/", "", 0)
+        file_record2 = FileIndexRecord(2, self.default_mountpoint, "test", "/", "", 0)
+        assert file_record == file_record2
 
     def test_insert(self):
         testfile = self.cursor.execute("SELECT * FROM files WHERE filename='test' LIMIT 1;").fetchone()
