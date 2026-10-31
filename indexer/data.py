@@ -199,6 +199,7 @@ class MountpointRecord(SQLiteDataClass):
         LIMIT 1;
     """
 
+    @override
     def __eq__(self, other: Any) -> bool:
         return self.path == other.path
 
@@ -260,6 +261,7 @@ class FileIndexRecord(SQLiteDataClass):
         LIMIT 1;
     """
 
+    @override
     def __eq__(self, other: Any) -> bool:
         return all(
             (
@@ -333,6 +335,7 @@ class PersonIndexRecord(SQLiteDataClass):
         LIMIT 1;
     """
 
+    @override
     def __eq__(self, other: Any) -> bool:
         return all(
             (
@@ -423,7 +426,8 @@ class PerformanceIndexRecord(SQLiteDataClass):
     two fields is plain non-tuple instance while the other is a tuple.
     Furthermore, the record is said to be _rooted at_ the non-tuple field.
 
-    The root of an instance can never change.
+    The root of an instance can never change. Runtime operations where we detect
+    wrong typing combination always raise an `InvalidDataClassState` exception.
     """
     # FIXME This typing is hella confusing!
     files: Union[FileIndexRecord, tuple[FileIndexRecord, ...]]
@@ -541,6 +545,8 @@ class PerformanceIndexRecord(SQLiteDataClass):
                     certainties=certainties
                 )
 
+    # FIXME Handle case of re-adds: branches that have been deleted but are re-
+    # added via these methods.
     def add_performers(self, performers: Iterable[PersonIndexRecord], certainties: Iterable[int]): 
         for certainty in certainties:
             if certainty != 0 and certainty != 1:
@@ -564,6 +570,30 @@ class PerformanceIndexRecord(SQLiteDataClass):
             self.added_certainties.extend(certainties)
         else:
             raise InvalidDataClassState("Object must be performer rooted to add performances.")
+
+    def remove_branch(self, branch: Union[PersonIndexRecord, FileIndexRecord]) -> bool:
+        """
+        Marks the branch value as deleted. Return True if the removal is
+        successful, False otherwise.
+        """
+        try:
+            if self.__is_performance_rooted():
+                self.performers = cast(tuple[PersonIndexRecord, ...], self.performers)
+                if not isinstance(branch, PersonIndexRecord):
+                    raise InvalidDataClassState(f"Wrong param for performance-rooted instance: {branch}")
+                branch = cast(PersonIndexRecord, branch)
+                idx = self.performers.index(branch)
+                self.deleted_branches.add(idx)
+            else:
+                self.files = cast(tuple[FileIndexRecord, ...], self.files)
+                if not isinstance(branch, FileIndexRecord):
+                    raise InvalidDataClassState(f"Wrong param for performer-rooted instance: {branch}")
+                branch = cast(FileIndexRecord, branch)
+                idx = self.files.index(branch)
+                self.deleted_branches.add(idx)
+            return True
+        except ValueError:
+            return False
 
     @staticmethod
     @override
@@ -639,8 +669,14 @@ class PerformanceIndexRecord(SQLiteDataClass):
     @override
     def save(self, cursor) -> bool:
         """
+        KEEP THIS CODE DUMB. The process is already complicated enough even
+        without clever code architecture. Keep this dumb to make reasoning easy.
+
         Note that this might effectively issue deletes if branches were pruned
         as well as inserts if branches were added.
+
+        Side effects: this makes the deleted records inaccessible from this
+        relation.
         """
         # TODO Maybe we should enclose this in a transaction
         if self.__is_person_rooted():
@@ -659,6 +695,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 if record not in cast(tuple[FileIndexRecord, ...], self.deleted_values)
             )
             self.files = remaining_file_branches
+            self.deleted_branches = set()
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
@@ -704,6 +741,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 if record not in cast(tuple[PersonIndexRecord, ...], self.deleted_values)
             )
             self.performers = remaining_performer_branches
+            self.deleted_branches = set()
             cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
