@@ -3,7 +3,7 @@ from .errors import ConstructorPreferred, InvalidDataClassState
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from enum import StrEnum
-from typing import Any, cast, ClassVar, Iterable, Optional, List, Set, Tuple, Union
+from typing import Any, cast, ClassVar, Collection, Iterable, Optional, List, Set, Tuple, Union
 from typing_extensions import override
 
 class NameDecisionRule(StrEnum):
@@ -452,7 +452,9 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
     deleted_branches: set[int] = field(init=False)
     """
-    Represents indices in the branch field which should count as deleted.
+    Represents indices in the branch field which should count as deleted. When
+    a record is actually removed from the branch field, the corresponding index
+    must also be removed here.
     """
 
     # Intentionally blank because we have to set the query depending on how this
@@ -545,32 +547,64 @@ class PerformanceIndexRecord(SQLiteDataClass):
                     certainties=certainties
                 )
 
-    # FIXME Handle case of re-adds: branches that have been deleted but are re-
-    # added via these methods.
-    def add_performers(self, performers: Iterable[PersonIndexRecord], certainties: Iterable[int]): 
+    # FIXME Handle case of duplicate adds
+    def add_performers(self, performers: Collection[PersonIndexRecord], certainties: Collection[int]): 
         for certainty in certainties:
             if certainty != 0 and certainty != 1:
                 raise ValueError(f"certainty must either be 0 or 1 given {certainty}")
 
+        if len(performers) != len(certainties):
+            raise ValueError("performers and certainties must have equal lengths")
+
         if self.__is_performance_rooted():
+            self.performers = cast(tuple[PersonIndexRecord, ...], self.performers)
             self.added_branches = cast(list[PersonIndexRecord], self.added_branches)
-            self.added_branches.extend(performers)
-            self.added_certainties.extend(certainties)
+            for p, c in zip(performers, certainties):
+                if p in self.deleted_values:
+                    try:
+                        p_idx = self.performers.index(p)
+                        self.deleted_branches.remove(p_idx)
+                    except ValueError:
+                        raise InvalidDataClassState("deleted_values invariant error")
+                    except KeyError:
+                        raise KeyError("delete_branches invariant error")
+
+                # Prevent dupes!
+                if p not in self.performers and p not in self.added_branches:
+                    self.added_branches.insert(-1, p)
+                    self.added_certainties.insert(-1, c)
         else:
             raise InvalidDataClassState("Object must be performance rooted to add performers.")
 
-    def add_files(self, files: Iterable[FileIndexRecord], certainties: Iterable[int]):
+    def add_files(self, files: Collection[FileIndexRecord], certainties: Collection[int]):
         for certainty in certainties:
             if certainty != 0 and certainty != 1:
                 raise ValueError(f"certainty must either be 0 or 1 given {certainty}")
 
+        if len(files) != len(certainties):
+            raise ValueError("files and certainties must have equal lengths")
+
         if self.__is_person_rooted():
+            self.files = cast(tuple[FileIndexRecord, ...], self.files)
             self.added_branches = cast(list[FileIndexRecord], self.added_branches)
-            self.added_branches.extend(files)
-            self.added_certainties.extend(certainties)
+            for f, c in zip(files, certainties):
+                if f in self.deleted_values:
+                    try:
+                        f_idx = self.files.index(f)
+                        self.deleted_branches.remove(f_idx)
+                    except ValueError:
+                        raise InvalidDataClassState(f"Can't find deleted value {f} in branches {self.added_branches}")
+                    except KeyError:
+                        raise KeyError("delete_branches invariant error")
+
+                # Prevent dupes!
+                if f not in self.files and f not in self.added_branches:
+                    self.added_branches.insert(-1, f)
+                    self.added_certainties.insert(-1, c)
         else:
             raise InvalidDataClassState("Object must be performer rooted to add performances.")
 
+    # If branch is not yet committed, remove directly from `added_branches`.
     def remove_branch(self, branch: Union[PersonIndexRecord, FileIndexRecord]) -> bool:
         """
         Marks the branch value as deleted. Return True if the removal is

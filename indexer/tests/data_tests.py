@@ -307,6 +307,16 @@ class PerformanceIndexRecordTests(SQLiteTest):
     def test_add_files_ex(self):
         with pytest.raises(InvalidDataClassState):
             self.dune_perf.add_files((self.spiderman,), (1,))
+
+    def test_remove_file_branches(self):
+        assert len(self.zendaya_perf_spiderman.deleted_values) == 0
+        assert self.zendaya_perf_spiderman.remove_branch(self.spiderman)
+        assert len(self.zendaya_perf_spiderman.deleted_values) == 1
+        assert self.zendaya_perf_spiderman.deleted_values[0] == self.spiderman
+        assert len(self.zendaya_perf_spiderman.all_files) == 0
+        # Readd deleted value
+        self.zendaya_perf_spiderman.add_files((self.spiderman,), (1,))
+        assert len(self.zendaya_perf_spiderman.deleted_values) == 0
     
     def test_fetch(self):
         # Fetch with a performer
