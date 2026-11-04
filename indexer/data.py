@@ -2,7 +2,7 @@ from .errors import ConstructorPreferred, InvalidDataClassState
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
-from enum import StrEnum
+from enum import StrEnum, auto
 from typing import Any, cast, ClassVar, Collection, Iterable, Optional, List, Set, Tuple, Union
 from typing_extensions import override
 
@@ -11,6 +11,18 @@ class NameDecisionRule(StrEnum):
     TRUNCATED_FIRSTNAME = "truncated-firstname"
     LASTNAME_BACKWARD = "lastname-backward"
     MANUAL_INPUT = "manual-input"
+
+class Ordering(StrEnum):
+    ASC = auto()
+    DESC = auto()
+
+@dataclass
+class QueryOrder(object):
+    field: str
+    ordering: Ordering = Ordering.ASC
+
+    def __str__(self):
+        return f"{self.field} {self.ordering}"
 
 NameTuple = Tuple[str, Optional[str], NameDecisionRule]
 

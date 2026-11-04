@@ -23,7 +23,8 @@ from .data import (
     FileIndexRecord,
     NameDecisionRule,
     PerformanceIndexRecord,
-    PersonIndexRecord
+    PersonIndexRecord,
+    QueryOrder
 )
 from .indexerdem import Indexerdem, MetadataCheckResult
 from .errors import InvalidDataClassState
@@ -84,7 +85,7 @@ class ErdemHomeScreen(ErdemScreen):
     def __init__(self):
         try:
             super().__init__()
-            self.TITLES = self.app.index.fetch_files()
+            self.TITLES = self.app.index.fetch_files(query_order=QueryOrder("filename"))
             self.title_count = Dynamic()
             self.__reset_title_list()
             self.PERFORMERS = self.app.index.fetch_persons(False)

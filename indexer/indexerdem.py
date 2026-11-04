@@ -14,8 +14,10 @@ from .data import (
     MetadataRecord,
     NameDecisionRule,
     NameTuple,
+    Ordering,
     PerformanceIndexRecord,
     PersonIndexRecord,
+    QueryOrder,
     starfields
 )
 from .errors import MountpointMisMatch, MountpointUnderivable
@@ -394,9 +396,14 @@ class Indexerdem(object):
     def __sqliteify(self, b: bool) -> int:
         return Indexerdem.SQLITE_TRUE if b else Indexerdem.SQLITE_FALSE
 
-    def fetch_files(self, limit: Optional[int] = None) -> tuple[FileIndexRecord, ...]:
+    def fetch_files(
+        self,
+        limit: Optional[int] = None,
+        query_order: QueryOrder = None
+    ) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
         has_limit = limit is not None
+        _query_order = f"ORDER BY {str(query_order)}" if query_order else ""
         all_fields = starfields(
             FileIndexRecord,
             col_mapping={
@@ -405,9 +412,9 @@ class Indexerdem(object):
         )
         bindings = (limit,) if has_limit else tuple()
         query = (
-            f"SELECT {all_fields} FROM files LIMIT=?"
+            f"SELECT {all_fields} FROM files {_query_order} LIMIT=?"
             if has_limit else
-            f"SELECT {all_fields} FROM files"
+            f"SELECT {all_fields} FROM files {_query_order}"
         )
         return tuple(FileIndexRecord(*row) for row in cursor.execute(query, bindings).fetchall())
     
