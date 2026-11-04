@@ -201,7 +201,10 @@ class MountpointRecord(SQLiteDataClass):
 
     @override
     def __eq__(self, other: Any) -> bool:
-        return self.path == other.path
+        try:
+            return self.path == other.path
+        except AttributeError:
+            return False
 
     @staticmethod
     def fetch(cursor, id: int) -> Optional["MountpointRecord"]:
@@ -263,14 +266,17 @@ class FileIndexRecord(SQLiteDataClass):
 
     @override
     def __eq__(self, other: Any) -> bool:
-        return all(
-            (
-                self.mountpoint == other.mountpoint,
-                self.filename == other.filename,
-                self.review == other.review,
-                self.rating == other.rating
+        try:
+            return all(
+                (
+                    self.mountpoint == other.mountpoint,
+                    self.filename == other.filename,
+                    self.review == other.review,
+                    self.rating == other.rating
+                )
             )
-        )
+        except AttributeError:
+            return False
 
     def __post_init__(self):
         if self.rating is None:
@@ -337,14 +343,17 @@ class PersonIndexRecord(SQLiteDataClass):
 
     @override
     def __eq__(self, other: Any) -> bool:
-        return all(
-            (
-                self.firstname == other.firstname,
-                self.lastname == other.lastname,
-                self.extraction_rule == other.extraction_rule,
-                self.is_deactivated == other.is_deactivated
+        try:
+            return all(
+                (
+                    self.firstname == other.firstname,
+                    self.lastname == other.lastname,
+                    self.extraction_rule == other.extraction_rule,
+                    self.is_deactivated == other.is_deactivated
+                )
             )
-        )
+        except AttributeError:
+            return False
 
     @staticmethod
     def fetch(cursor, id) -> Optional["PersonIndexRecord"]:
@@ -716,46 +725,53 @@ class PerformanceIndexRecord(SQLiteDataClass):
         if self.__is_person_rooted():
             performer = cast(PersonIndexRecord, self.performers)
             # Handle deletes first
-            delete_stmt_tmp = """
-                DELETE FROM participation
-                WHERE person_id = ?
-                AND file_id in (%s);
-            """
-            delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
-            delete_vals = [record.id for record in cast(tuple[FileIndexRecord, ...], self.deleted_values)]
-            # actually prune the branches now
-            remaining_file_branches = tuple(
-                record for record in cast(tuple[FileIndexRecord, ...], self.files)
-                if record not in cast(tuple[FileIndexRecord, ...], self.deleted_values)
-            )
-            self.files = remaining_file_branches
-            self.deleted_branches = set()
-            cursor.execute(delete_stmt, delete_vals)
+            if self.deleted_values:
+                delete_stmt_tmp = """
+                    DELETE FROM participation
+                    WHERE person_id = ?
+                    AND file_id in (%s);
+                """
+                delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
+                delete_vals = [record.id for record in cast(tuple[FileIndexRecord, ...], self.deleted_values)]
+                # actually prune the branches now
+                remaining_file_branches = tuple(
+                    record for record in cast(tuple[FileIndexRecord, ...], self.files)
+                    if record not in cast(tuple[FileIndexRecord, ...], self.deleted_values)
+                )
+                self.files = remaining_file_branches
+                self.deleted_branches = set()
+                cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
-            insert_stmt_tmp = """
-                INSERT INTO participation (person_id, file_id, certainty)
-                VALUES %S;
-            """
-            insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
-            insert_vals = (
-                (performer.id, file.id, cert)
-                for file, cert in zip(cast(list[FileIndexRecord], self.added_branches), self.added_certainties)
-            )
-            cursor.execute(insert_stmt, insert_vals)
+            if self.added_branches:
+                all_but_one_val = "(?, ?, ?)," * (len(self.added_branches) - 1)
+                with_last_val = f"{all_but_one_val}(?, ?, ?)"
+                insert_stmt = (
+                    "INSERT INTO participation (person_id, file_id, is_certain)\n"
+                    f"VALUES {with_last_val};"
+                )
+                insert_vals = []
+                for file, cert in zip(cast(list[FileIndexRecord], self.added_branches), self.added_certainties):
+                    insert_vals.extend((performer.id, file.id, cert))
+                cursor.execute(insert_stmt, insert_vals)
+                self.added_branches.extend(self.files)
+                self.files = tuple(self.added_branches)
+                self.added_branches = []
+                self.added_certainties = []
 
             # Bulk update last
             update_stmt_tmp = """
                 UPDATE participation
-                SET file_id=?
+                SET is_certain=?
                 WHERE person_id=?
+                AND file_id=?
                 LIMIT 1;
             """
-            cursor.execute(
+            cursor.executemany(
                 update_stmt_tmp,
-                (
-                    (performer.id, file.id, cert)
-                    for file, cert in zip(cast(tuple[FileIndexRecord], self.files), self.certainties)
+                tuple(
+                    (cert, performer.id, file.id)
+                    for file, cert in zip(cast(tuple[FileIndexRecord, ...], self.files), self.certainties)
                 )
             )
             return True
@@ -780,8 +796,8 @@ class PerformanceIndexRecord(SQLiteDataClass):
 
             # Handle insertions next
             insert_stmt_tmp = """
-                INSERT INTO participation (person_id, file_id, certainty)
-                VALUES %S;
+                INSERT INTO participation (person_id, file_id, is_certain)
+                VALUES %s;
             """
             insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
             insert_vals = (

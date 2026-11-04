@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import cast
 from unittest import mock
 
 from .base import SQLiteTest, TestException
@@ -317,6 +318,23 @@ class PerformanceIndexRecordTests(SQLiteTest):
         # Readd deleted value
         self.zendaya_perf_spiderman.add_files((self.spiderman,), (1,))
         assert len(self.zendaya_perf_spiderman.deleted_values) == 0
+
+    def test_save_perf_root(self):
+        assert self.p_and_r not in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
+        assert len(cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)) == 1
+        assert len(self.zendaya_perf_spiderman.added_branches) == 0
+        assert len(self.zendaya_perf_spiderman.added_certainties) == 0
+        self.zendaya_perf_spiderman.add_files((self.p_and_r,), (1,))
+        assert self.p_and_r in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
+        assert len(cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)) == 2
+        assert len(self.zendaya_perf_spiderman.added_branches) == 1
+        assert len(self.zendaya_perf_spiderman.added_certainties) == 1
+        assert self.zendaya_perf_spiderman.save(self.cursor)
+        assert len(self.zendaya_perf_spiderman.added_branches) == 0
+        assert len(self.zendaya_perf_spiderman.added_certainties) == 0
+        assert len(self.zendaya_perf_spiderman.files) == 2
+        assert self.p_and_r in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
+        assert self.spiderman in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
     
     def test_fetch(self):
         # Fetch with a performer
