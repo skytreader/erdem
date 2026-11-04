@@ -399,7 +399,7 @@ class Indexerdem(object):
     def fetch_files(
         self,
         limit: Optional[int] = None,
-        query_order: QueryOrder = None
+        query_order: Optional[QueryOrder] = None
     ) -> tuple[FileIndexRecord, ...]:
         cursor = self.conn.cursor()
         has_limit = limit is not None

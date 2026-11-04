@@ -762,12 +762,12 @@ class PerformanceIndexRecord(SQLiteDataClass):
                     "INSERT INTO participation (person_id, file_id, is_certain)\n"
                     f"VALUES {with_last_val};"
                 )
-                insert_vals = []
+                insert_vals: list[int] = []
                 for file, cert in zip(cast(list[FileIndexRecord], self.added_branches), self.added_certainties):
-                    insert_vals.extend((performer.id, file.id, cert))
+                    insert_vals.extend((performer.id, file.id, cert)) # type: ignore
                 cursor.execute(insert_stmt, insert_vals)
-                self.added_branches.extend(self.files)
-                self.files = tuple(self.added_branches)
+                self.added_branches.extend(self.files) # type: ignore
+                self.files = tuple(self.added_branches) # type: ignore
                 self.added_branches = []
                 self.added_certainties = []
 
@@ -812,7 +812,7 @@ class PerformanceIndexRecord(SQLiteDataClass):
                 VALUES %s;
             """
             insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
-            insert_vals = (
+            insert_vals = ( # type: ignore
                 (performer.id, file.id, cert)
                 for performer, cert in zip(cast(list[PersonIndexRecord], self.added_branches), self.added_certainties)
             )
