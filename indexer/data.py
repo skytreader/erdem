@@ -790,45 +790,53 @@ class PerformanceIndexRecord(SQLiteDataClass):
         else:
             file = cast(FileIndexRecord, self.files)
             # Handle deletes first
-            delete_stmt_tmp = """
-                DELETE FROM participation
-                WHERE file_id = ?
-                AND person_id in (%s);
-            """
-            delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
-            delete_vals = [record.id for record in cast(tuple[PersonIndexRecord, ...], self.deleted_values)]
-            # actually prune branches now
-            remaining_performer_branches = tuple(
-                record for record in cast(tuple[PersonIndexRecord, ...], self.performers)
-                if record not in cast(tuple[PersonIndexRecord, ...], self.deleted_values)
-            )
-            self.performers = remaining_performer_branches
-            self.deleted_branches = set()
-            cursor.execute(delete_stmt, delete_vals)
+            if self.deleted_values:
+                delete_stmt_tmp = """
+                    DELETE FROM participation
+                    WHERE file_id = ?
+                    AND person_id in (%s);
+                """
+                delete_stmt = delete_stmt_tmp % ",".join("?" * len(self.deleted_branches))
+                delete_vals = [record.id for record in cast(tuple[PersonIndexRecord, ...], self.deleted_values)]
+                # actually prune branches now
+                remaining_performer_branches = tuple(
+                    record for record in cast(tuple[PersonIndexRecord, ...], self.performers)
+                    if record not in cast(tuple[PersonIndexRecord, ...], self.deleted_values)
+                )
+                self.performers = remaining_performer_branches
+                self.deleted_branches = set()
+                cursor.execute(delete_stmt, delete_vals)
 
             # Handle insertions next
-            insert_stmt_tmp = """
-                INSERT INTO participation (person_id, file_id, is_certain)
-                VALUES %s;
-            """
-            insert_stmt = insert_stmt_tmp % ",".join("(?, ?, ?)" * len(self.added_branches))
-            insert_vals = ( # type: ignore
-                (performer.id, file.id, cert)
-                for performer, cert in zip(cast(list[PersonIndexRecord], self.added_branches), self.added_certainties)
-            )
-            cursor.execute(insert_stmt, insert_vals)
+            if self.added_branches:
+                insert_stmt_tmp = """
+                    INSERT INTO participation (person_id, file_id, is_certain)
+                    VALUES %s;
+                """
+                insert_stmt = insert_stmt_tmp % ",".join(["(?, ?, ?)" for _ in self.added_branches])
+                insert_vals = ( # type: ignore
+                    (performer.id, file.id, cert)
+                    for performer, cert in zip(cast(list[PersonIndexRecord], self.added_branches), self.added_certainties)
+                )
+                print(insert_stmt)
+                cursor.executemany(insert_stmt, insert_vals)
+                self.added_branches.extend(self.performers) # type: ignore
+                self.performers = tuple(self.added_branches) # type: ignore
+                self.added_branches = []
+                self.added_certainties = []
 
             # Bulk update last
             update_stmt_tmp = """
                 UPDATE participation
-                SET person_id=?
-                WHERE file_id=?
+                SET is_certain=?
+                WHERE person_id=?
+                AND file_id=?
                 LIMIT 1;
             """
-            cursor.execute(
+            cursor.executemany(
                 update_stmt_tmp,
-                (
-                    (performer.id, file.id, cert)
+                tuple(
+                    (cert, performer.id, file.id)
                     for performer, cert in zip(cast(tuple[PersonIndexRecord], self.performers), self.certainties)
                 )
             )

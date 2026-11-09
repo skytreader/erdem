@@ -273,7 +273,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
             0
         )
         self.dune = self.insert(FileIndexRecord, None, self.default_mountpoint, "Dune.mp4", "/", "", 0)
-        self.dune_perf = self.insert(
+        self.dune_perf_zendaya = self.insert(
             PerformanceIndexRecord,
             self.dune,
             tuple([self.zendaya]),
@@ -307,7 +307,7 @@ class PerformanceIndexRecordTests(SQLiteTest):
 
     def test_add_files_ex(self):
         with pytest.raises(InvalidDataClassState):
-            self.dune_perf.add_files((self.spiderman,), (1,))
+            self.dune_perf_zendaya.add_files((self.spiderman,), (1,))
 
     def test_remove_file_branches(self):
         assert len(self.zendaya_perf_spiderman.deleted_values) == 0
@@ -335,6 +335,23 @@ class PerformanceIndexRecordTests(SQLiteTest):
         assert len(self.zendaya_perf_spiderman.files) == 2
         assert self.p_and_r in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
         assert self.spiderman in cast(tuple[FileIndexRecord, ...], self.zendaya_perf_spiderman.all_files)
+
+    def test_save_file_root(self):
+        assert self.jslate not in cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)
+        assert len(cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)) == 1
+        assert len(self.dune_perf_zendaya.added_branches) == 0
+        assert len(self.dune_perf_zendaya.added_certainties) == 0
+        self.dune_perf_zendaya.add_performers((self.jslate,), (1,))
+        assert self.jslate in cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)
+        assert len(cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)) == 2
+        assert len(self.dune_perf_zendaya.added_branches) == 1
+        assert len(self.dune_perf_zendaya.added_certainties) == 1
+        assert self.dune_perf_zendaya.save(self.cursor)
+        assert len(self.dune_perf_zendaya.added_branches) == 0
+        assert len(self.dune_perf_zendaya.added_certainties) == 0
+        assert len(self.dune_perf_zendaya.performers) == 2
+        assert self.jslate in cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)
+        assert self.zendaya in cast(tuple[PersonIndexRecord, ...], self.dune_perf_zendaya.all_performers)
     
     def test_fetch(self):
         # Fetch with a performer
